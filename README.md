@@ -40,10 +40,14 @@ Or grab the latest build from our [Release Page](https://github.com/microsoft/co
 
 ## Shell conflicts
 
+> [!NOTE]
+> Any command not mention is included in this suite. The following only lists conflicts.
+
+> [!WARNING]
+> PowerShell 7.4 or newer is required. Older PowerShell versions aren't supported.
+
 Several commands share names with built-ins in CMD and PowerShell. Whether the Coreutils
 version runs depends on the shell, the PATH order, and (for PowerShell) the alias table.
-
-> ⚠️ **PowerShell 7.4 or newer is required.** Older PowerShell versions aren't supported.
 
 Legend: ✅ ships and works · ⚠️ ships but conflicts with a built-in · 🛑 not shipped
 
