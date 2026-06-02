@@ -41,7 +41,7 @@ Or grab the latest build from our [Release Page](https://github.com/microsoft/co
 ## Shell conflicts
 
 > [!NOTE]
-> Any command not mention is included in this suite. The following only lists conflicts.
+> Any command not mentioned is included in this suite. The following only lists conflicts.
 
 > [!WARNING]
 > PowerShell 7.4 or newer is required. Older PowerShell versions aren't supported.
