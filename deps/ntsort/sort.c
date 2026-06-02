@@ -258,7 +258,7 @@ TCHAR *get_string(int id)
                "                              being stored in a temporary file) such that\r\n"
                "                              the amounts of memory used for both the sort\r\n"
                "                              and merge passes are equal.  The default\r\n"
-               "                              maximum memory size is 90%% of available main\r\n"
+               "                              maximum memory size is 90% of available main\r\n"
                "                              memory if both the input and output are\r\n"
                "                              files, and 45% of main memory otherwise.\r\n";
     case MSG_SORT_USAGE2:
