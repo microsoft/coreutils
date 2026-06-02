@@ -64,10 +64,6 @@ fn main() {
     let _restore_cp = set_console_cp_utf8();
 
     let utils = util_map();
-    // NOTE: We're not using uucore::args_os() here, because that performs globbing on Windows,
-    // which breaks various utilities, such as `find . -name "*.txt"`, where *.txt gets
-    // immediately expanded to whatever .txt files are in the current directory.
-    //let mut args = std::env::args_os();
     let mut args = uucore::args_os();
 
     let binary = binary_path(&mut args);
