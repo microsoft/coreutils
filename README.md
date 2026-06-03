@@ -90,6 +90,19 @@ Legend: ✅ ships and works · ⚠️ ships but conflicts with a built-in · �
 | **File permissions**  | Windows uses ACLs, not POSIX permission bits. Permission-based predicates (for example `find -perm`) may behave differently or be unavailable. |
 | **Symbolic links**    | Reading existing symbolic links works without elevation. Creating new symbolic links requires Developer Mode ([**Settings > System > Advanced**](https://learn.microsoft.com/windows/advanced-settings)) or an elevated terminal. |
 
+### PowerShell parser boundaries
+
+The PowerShell integration rewrites interactive input for common quoting,
+globbing, and alias-conflict cases, but it does not make PowerShell parse input
+like a POSIX shell. Use PowerShell quoting for tokens that would normally be
+backslash-escaped in `sh`:
+
+| POSIX-style input | PowerShell input |
+| ----------------- | ---------------- |
+| `cat space\ name.txt` | `cat 'space name.txt'` |
+| `ls \[ab\].txt` | `ls '[ab].txt'` |
+| `find . \( -name "*.txt" -o -name "*.log" \) -print` | `find . '(' -name "*.txt" -o -name "*.log" ')' -print` |
+
 ### Intentionally dropped
 
 Commands that exist upstream but aren't shipped here because they rely on POSIX-only concepts, would break existing Windows scripts, or simply aren't useful on Windows.
