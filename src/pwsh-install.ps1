@@ -1,6 +1,9 @@
 # Copyright (c) Microsoft Corporation.
 # Licensed under the MIT License.
 
+# A typical test invocation looks like this (as admin):
+#  .\src\pwsh-install.ps1 -Action Install -Scope CurrentUser -CmdDir 'C:\Program Files\coreutils\cmd'
+
 param(
     [Parameter(Mandatory = $true)]
     [ValidateSet('Install', 'Uninstall')]
@@ -37,10 +40,8 @@ function Remove-FileIfExists([string]$Path) {
 function Get-InjectedSection([string]$CmdDir) {
     $templatePath = Join-Path $PSScriptRoot 'pwsh-install-template.ps1'
     $template = Get-Content -LiteralPath $templatePath -Raw
-    $cmdDirFull = [System.IO.Path]::GetFullPath($CmdDir).TrimEnd('\')
-    $cmdPfx = "& '" + $cmdDirFull + '\'
-    $template = $template.Replace('!!CMDPFX!!', $cmdPfx)
-    $template = $template.Replace('!!CMDDIR!!', $cmdDirFull.Replace("'", "''"))
+    $cmdDir = [System.IO.Path]::GetFullPath($CmdDir).TrimEnd('\') + '\'
+    $template = $template.Replace('!!CMDDIR!!', $cmdDir)
     $body = $template.TrimEnd("`r", "`n")
     return "$MarkerLine`r`n$body`r`n$MarkerLine"
 }

@@ -28,8 +28,6 @@ $script:__COREUTILS_FAST_SKIP__ = [regex]::new(
         [System.Text.RegularExpressions.RegexOptions]::IgnoreCase
 )
 
-$script:__COREUTILS_CMD_DIR__ = '!!CMDDIR!!'
-
 # Casting the scriptblock to Func<Ast,bool> once and reusing it avoids the
 # per-FindAll scriptblock-to-delegate wrapping overhead (~1.7x faster).
 $script:__COREUTILS_CMD_PREDICATE__ = [System.Func[System.Management.Automation.Language.Ast, bool]] {
@@ -87,6 +85,9 @@ $script:__COREUTILS_ARG_EVAL__ = [System.Text.RegularExpressions.MatchEvaluator]
     return $ExecutionContext.InvokeCommand.ExpandString($m.Groups[4].Value)
 }
 
+# 0: not tested, 1: coreutils not installed, 2: coreutils installed.
+$script:__COREUTILS_CMD_DIR_TEST__ = 0
+
 # PSConsoleHostReadLine override that rewrites coreutils command names to their
 # .cmd equivalents after PSReadLine returns (history keeps the original).
 #
@@ -109,10 +110,15 @@ function PSConsoleHostReadLine {
         return $line
     }
 
-    # Roamed/synced profiles can load this snippet on machines where coreutils
-    # is not installed. In that case leave the command untouched so PowerShell
-    # can fall back to aliases, functions, PATH, or its normal error handling.
-    if (-not (Test-Path -LiteralPath $script:__COREUTILS_CMD_DIR__ -PathType Container)) {
+    # Roamed/synced profiles can load this snippet on machines where coreutils is not installed.
+    # Test for the existence of the command directory once and remember the result.
+    if ($script:__COREUTILS_CMD_DIR_TEST__ -eq 0) {
+        $script:__COREUTILS_CMD_DIR_TEST__ = 1
+        if (Test-Path -LiteralPath '!!CMDDIR!!' -PathType Container -ErrorAction Ignore) {
+            $script:__COREUTILS_CMD_DIR_TEST__ = 2
+        }
+    }
+    if ($script:__COREUTILS_CMD_DIR_TEST__ -ne 2) {
         return $line
     }
 
@@ -144,7 +150,7 @@ function PSConsoleHostReadLine {
         $cmdElement = $cmd.CommandElements[0]
         $start = $cmdElement.Extent.StartOffset
         $end = $cmdElement.Extent.EndOffset
-        $replacement = "!!CMDPFX!!"
+        $replacement = "& '!!CMDDIR!!"
 
         switch ($baseName) {
             'la' { $replacement += "ls.cmd' --color=auto -AFhl" }
