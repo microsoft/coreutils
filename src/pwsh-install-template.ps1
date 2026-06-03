@@ -28,6 +28,8 @@ $script:__COREUTILS_FAST_SKIP__ = [regex]::new(
         [System.Text.RegularExpressions.RegexOptions]::IgnoreCase
 )
 
+$script:__COREUTILS_CMD_DIR__ = '!!CMDDIR!!'
+
 # Casting the scriptblock to Func<Ast,bool> once and reusing it avoids the
 # per-FindAll scriptblock-to-delegate wrapping overhead (~1.7x faster).
 $script:__COREUTILS_CMD_PREDICATE__ = [System.Func[System.Management.Automation.Language.Ast, bool]] {
@@ -104,6 +106,13 @@ function PSConsoleHostReadLine {
 
     # If the line contains no coreutils name, we don't need to parse the AST at all.
     if (-not $script:__COREUTILS_FAST_SKIP__.IsMatch($line)) {
+        return $line
+    }
+
+    # Roamed/synced profiles can load this snippet on machines where coreutils
+    # is not installed. In that case leave the command untouched so PowerShell
+    # can fall back to aliases, functions, PATH, or its normal error handling.
+    if (-not (Test-Path -LiteralPath $script:__COREUTILS_CMD_DIR__ -PathType Container)) {
         return $line
     }
 

@@ -37,8 +37,10 @@ function Remove-FileIfExists([string]$Path) {
 function Get-InjectedSection([string]$CmdDir) {
     $templatePath = Join-Path $PSScriptRoot 'pwsh-install-template.ps1'
     $template = Get-Content -LiteralPath $templatePath -Raw
-    $cmdPfx = "& '" + [System.IO.Path]::GetFullPath($CmdDir).TrimEnd('\') + '\'
+    $cmdDirFull = [System.IO.Path]::GetFullPath($CmdDir).TrimEnd('\')
+    $cmdPfx = "& '" + $cmdDirFull + '\'
     $template = $template.Replace('!!CMDPFX!!', $cmdPfx)
+    $template = $template.Replace('!!CMDDIR!!', $cmdDirFull.Replace("'", "''"))
     $body = $template.TrimEnd("`r", "`n")
     return "$MarkerLine`r`n$body`r`n$MarkerLine"
 }
