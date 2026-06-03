@@ -1418,7 +1418,7 @@ void read_rec()
      * delimiting NULL in the record or beyond), place record in a
      * separate "short" list.
      */
-    if (char_count <= Position)
+    if (Position > 0 && char_count <= Position)
     {
         --Last_recp;
         --Short_recp;
