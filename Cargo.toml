@@ -35,7 +35,7 @@ uucore = { path = "deps/coreutils/src/uucore" }
 # * dircolors
 # * expand (conflicts with a DOS command)
 # * more (conflicts with a DOS command; the implementation is also not great right now)
-# * paste (conflicts with a DOS command)
+# * paste (not currently shipped)
 # * shred
 # * vdir (not particularly widely used)
 base32 = { package = "uu_base32", path = "deps/coreutils/src/uu/base32" }
