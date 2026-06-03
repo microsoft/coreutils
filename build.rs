@@ -90,6 +90,7 @@ fn compile_ntsort() {
 
     cc::Build::new()
         .file("deps/ntsort/sort.c")
+        .define("NDEBUG", "1")
         .define("UNICODE", "1")
         .define("_UNICODE", "1")
         .define("WIN32_LEAN_AND_MEAN", "1")
