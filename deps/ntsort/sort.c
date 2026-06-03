@@ -237,7 +237,7 @@ TCHAR *get_string(int id)
                "                              By default comparisons start at the first\r\n"
                "                              character in each line.\r\n"
                "  /L[OCALE] locale            Overrides the system default locale with\r\n"
-               "                              the specified one.  The \"C\" locale yields\r\n"
+               "                              the specified one.  The \"\"C\"\" locale yields\r\n"
                "                              the fastest collating sequence and is\r\n"
                "                              currently the only alternative.  The sort\r\n"
                "                              is always case insensitive.\r\n"
