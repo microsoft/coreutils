@@ -21,6 +21,9 @@ $SectionMarker = '60b36fc6-2d59-49df-be51-28dd2f4c3c9a'
 $MarkerLine = "# DO NOT MODIFY -- coreutils -- $SectionMarker"
 # Earliest PowerShell that supports PSNativeCommandPreserveBytePipe.
 $MinPwshVersion = [version]'7.4.0'
+# PowerShell 7.4 ships PSReadLine 2.3.4, which has the
+# ReadLine(Runspace, EngineIntrinsics, bool?) overload used by the profile hook.
+$MinPSReadLineVersion = [version]'2.3.4'
 # Contains SID --> Microsoft.PowerShell_profile.ps1 mappins,
 # such that we can clean them up on uninstall.
 $ProfilesRegPath = 'HKLM:\SOFTWARE\Microsoft\coreutils\PowerShellProfiles'
@@ -31,6 +34,24 @@ function Remove-FileIfExists([string]$Path) {
         if ($e.CategoryInfo.Category -ne 'ObjectNotFound') {
             throw $e
         }
+    }
+}
+
+function Assert-PSReadLineRequirement {
+    try {
+        $module = Import-Module PSReadLine -PassThru -ErrorAction Stop | Select-Object -First 1
+    }
+    catch {
+        throw "PowerShell integration requires PSReadLine $MinPSReadLineVersion or newer, but PSReadLine could not be loaded: $($_.Exception.Message)"
+    }
+
+    if (!$module -or !$module.Version) {
+        throw "PowerShell integration requires PSReadLine $MinPSReadLineVersion or newer, but the resolved PSReadLine module did not report a version"
+    }
+
+    if ($module.Version -lt $MinPSReadLineVersion) {
+        $path = if ($module.Path) { " from '$($module.Path)'" } else { '' }
+        throw "PowerShell integration requires PSReadLine $MinPSReadLineVersion or newer, but PowerShell resolved PSReadLine $($module.Version)$path. Update or remove the older PSReadLine module and re-run the installer."
     }
 }
 
@@ -243,6 +264,7 @@ function Get-ProfilePlan([bool] $Install, [string]$Scope) {
 $install = $Action -eq 'Install'
 $plan = @(Get-ProfilePlan $install $Scope)
 $section = if ($install) {
+    Assert-PSReadLineRequirement
     Get-InjectedSection $CmdDir
 }
 else {
