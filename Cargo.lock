@@ -460,6 +460,7 @@ dependencies = [
  "uu_nproc",
  "uu_numfmt",
  "uu_od",
+ "uu_paste",
  "uu_pathchk",
  "uu_pr",
  "uu_printenv",
@@ -3028,6 +3029,15 @@ dependencies = [
  "half",
  "libc",
  "rustix",
+ "uucore",
+]
+
+[[package]]
+name = "uu_paste"
+version = "0.8.0"
+dependencies = [
+ "clap",
+ "fluent",
  "uucore",
 ]
 

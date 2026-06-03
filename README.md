@@ -66,7 +66,6 @@ Legend: ✅ ships and works · ⚠️ ships but conflicts with a built-in · �
 | `mkdir`    |  ⚠️  |       ⚠️        | |
 | `more`     |  🛑  |       🛑        | Conflicts with the built-in DOS command (consider `edit` as an alternative) |
 | `mv`       |  ✅  |       ⚠️        | |
-| `paste`    |  🛑  |       🛑        | Conflicts with the built-in DOS command |
 | `pwd`      |  ✅  |       ⚠️        | |
 | `rm`       |  ✅  |       ⚠️        | |
 | `rmdir`    |  ⚠️  |       ⚠️        | |

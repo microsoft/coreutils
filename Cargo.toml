@@ -35,7 +35,6 @@ uucore = { path = "deps/coreutils/src/uucore" }
 # * dircolors
 # * expand (conflicts with a DOS command)
 # * more (conflicts with a DOS command; the implementation is also not great right now)
-# * paste (conflicts with a DOS command)
 # * shred
 # * vdir (not particularly widely used)
 base32 = { package = "uu_base32", path = "deps/coreutils/src/uu/base32" }
@@ -77,6 +76,7 @@ mv = { package = "uu_mv", path = "deps/coreutils/src/uu/mv" }
 nl = { package = "uu_nl", path = "deps/coreutils/src/uu/nl" }
 numfmt = { package = "uu_numfmt", path = "deps/coreutils/src/uu/numfmt" }
 od = { package = "uu_od", path = "deps/coreutils/src/uu/od" }
+paste = { package = "uu_paste", path = "deps/coreutils/src/uu/paste" }
 pathchk = { package = "uu_pathchk", path = "deps/coreutils/src/uu/pathchk" }
 pr = { package = "uu_pr", path = "deps/coreutils/src/uu/pr" }
 printenv = { package = "uu_printenv", path = "deps/coreutils/src/uu/printenv" }
