@@ -181,13 +181,6 @@ begin
         RaiseException('Failed to write system PATH');
 end;
 
-function ExecPwsh(const Params: String; var Output: TExecOutput): Boolean;
-var
-    ResultCode: Integer;
-begin
-    Result := ExecAndCaptureOutput('pwsh.exe', Params, '', SW_SHOWNORMAL, ewWaitUntilTerminated, ResultCode, Output) and (ResultCode = 0);
-end;
-
 function HasMsiPowerShell: Boolean;
 var
     Names: TArrayOfString;
@@ -217,7 +210,7 @@ procedure DetectPowerShell;
 var
     VerParts: TArrayOfString;
     Params: String;
-    Major, Minor: Integer;
+    ResultCode, Major, Minor: Integer;
     Output: TExecOutput;
     Version: String;
 begin
@@ -227,7 +220,10 @@ begin
     g_HasSupportedPowerShellExecutionPolicy := False;
 
     Params := '-NoProfile -NonInteractive -Command "$PSVersionTable.PSVersion.ToString(); Get-ExecutionPolicy"';
-    if (not ExecPwsh(Params, Output)) or (GetArrayLength(Output.StdOut) < 2) then
+    if (not ExecAndCaptureOutput('pwsh.exe', Params, '', SW_SHOWNORMAL, ewWaitUntilTerminated, ResultCode, Output)) or
+       (ResultCode <> 0) or
+       (GetArrayLength(Output.StdOut) < 2)
+    then
         Exit;
 
     Version := Trim(Output.StdOut[0]);
@@ -247,9 +243,13 @@ procedure RunPwshScript(const ExtraParams: String);
 var
     Output: TExecOutput;
     Params, Detail: String;
+    ResultCode: Integer;
 begin
     Params := '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File ' + AddQuotes(g_AppDirPath + 'pwsh-install.ps1') + ' ' + ExtraParams;
-    if not ExecPwsh(Params, Output) then
+    if not ExecAndCaptureOutput('pwsh.exe', Params, '', SW_SHOWNORMAL, ewWaitUntilTerminated, ResultCode, Output) then
+        Exit;
+
+    if ResultCode <> 0 then
     begin
         Detail := '';
         if GetArrayLength(Output.StdErr) > 0 then
