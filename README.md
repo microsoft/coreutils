@@ -94,14 +94,9 @@ Legend: ✅ ships and works · ⚠️ ships but conflicts with a built-in · �
 
 The PowerShell integration rewrites interactive input for common quoting,
 globbing, and alias-conflict cases, but it does not make PowerShell parse input
-like a POSIX shell. Use PowerShell quoting for tokens that would normally be
-backslash-escaped in `sh`:
-
-| POSIX-style input | PowerShell input |
-| ----------------- | ---------------- |
-| `cat space\ name.txt` | `cat 'space name.txt'` |
-| `ls \[ab\].txt` | `ls '[ab].txt'` |
-| `find . \( -name "*.txt" -o -name "*.log" \) -print` | `find . '(' -name "*.txt" -o -name "*.log" ')' -print` |
+like a POSIX shell. Use PowerShell's backtick escape (`` ` ``) instead of
+POSIX-style backslashes, for example ``cat space` name.txt``,
+``ls `[ab`].txt``, or ``find . `( -name "*.txt" -o -name "*.log" `) -print``.
 
 ### Intentionally dropped
 
