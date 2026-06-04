@@ -137,11 +137,13 @@ extends:
                   - script: cargo build --frozen --config .cargo/release-windows-ms.toml --release --bin coreutils --target ${{platform}}
                     displayName: Build ${{platform}} Release
                   - task: CopyFiles@2
-                    displayName: Stage ${{platform}} coreutils.exe
+                    displayName: Stage ${{platform}} coreutils.exe/.pdb
                     inputs:
                       sourceFolder: "$(CARGO_TARGET_DIR)/${{platform}}/release"
                       targetFolder: "$(Build.SourcesDirectory)/.staging/${{platform}}"
-                      contents: "coreutils.exe"
+                      contents: |
+                        coreutils.exe
+                        coreutils.pdb
               # Sign coreutils.exe.
               - task: onebranch.pipeline.signing@1
                 displayName: Sign coreutils.exe
@@ -152,6 +154,27 @@ extends:
                   search_root: "$(Build.SourcesDirectory)/.staging"
                   use_testsign: false
                   in_container: true
+              # Package the signed coreutils.exe and its coreutils.pdb into a .zip.
+              - ${{ each platform in parameters.buildPlatforms }}:
+                  - pwsh: |-
+                      New-Item -ItemType Directory -Force -Path $env:OB_OUTPUTDIRECTORY | Out-Null
+                      $zip = Join-Path $env:OB_OUTPUTDIRECTORY "$env:OUTPUT_BASENAME.zip"
+                      $staging = Join-Path $env:BUILD_SOURCESDIRECTORY ".staging\${{platform}}"
+                      $pkgRoot = Join-Path $env:BUILD_SOURCESDIRECTORY ".staging\zip"
+                      $pkgDir = Join-Path $pkgRoot $env:OUTPUT_BASENAME
+                      New-Item -ItemType Directory -Force -Path $pkgDir | Out-Null
+                      Copy-Item -Path $staging\* -Destination $pkgDir
+                      & tar.exe -c -v --format=zip -f $zip -C $pkgRoot $env:OUTPUT_BASENAME
+                      Write-Host "Produced $zip"
+                    env:
+                      OB_OUTPUTDIRECTORY: $(ob_outputDirectory)
+                      ${{ if eq(platform, 'aarch64-pc-windows-msvc') }}:
+                        OUTPUT_BASENAME: coreutils-$(CoreutilsVersion)-arm64
+                      ${{ elseif eq(platform, 'x86_64-pc-windows-msvc') }}:
+                        OUTPUT_BASENAME: coreutils-$(CoreutilsVersion)-x64
+                      ${{ else }}:
+                        OUTPUT_BASENAME: coreutils-$(CoreutilsVersion)-x86
+                    displayName: Zip ${{platform}} coreutils.exe/.pdb
               # Run ISCC once to generate the uninstaller .e32 file.
               # Rename .e32 → .exe so the signing task recognises the extension.
               # The .e32 is arch-independent (confirmed: same hash for x64 and arm64).
