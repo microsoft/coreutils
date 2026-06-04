@@ -293,7 +293,7 @@ begin
     Description :=
         'Coreutils needs a small profile snippet to work inside PowerShell. ' +
         'Without it, PowerShell mangles argument quoting and globbing, so most Coreutils commands wouldn''t behave correctly. ' +
-        'The snippet also overrides PowerShell''s built-in aliases (cat, cp, ls, ...) so they resolve to the Coreutils versions.' + #13#10#13#10 +
+        'The snippet does not remove PowerShell''s built-in aliases. It rewrites interactive input so names such as cat, cp, and ls resolve to the Coreutils versions.' + #13#10#13#10 +
         'PowerShell 7.4 or newer is required (it requires PSNativeCommandPreserveBytePipe).';
 
     if not g_HasSupportedPowerShellExecutionPolicy then

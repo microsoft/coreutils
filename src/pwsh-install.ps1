@@ -24,7 +24,7 @@ $SectionMarker = '60b36fc6-2d59-49df-be51-28dd2f4c3c9a'
 $MarkerLine = "# DO NOT MODIFY -- coreutils -- $SectionMarker"
 # Earliest PowerShell that supports PSNativeCommandPreserveBytePipe.
 $MinPwshVersion = [version]'7.4.0'
-# Contains SID --> Microsoft.PowerShell_profile.ps1 mappins,
+# Contains SID --> Microsoft.PowerShell_profile.ps1 mappings,
 # such that we can clean them up on uninstall.
 $ProfilesRegPath = 'HKLM:\SOFTWARE\Microsoft\coreutils\PowerShellProfiles'
 
