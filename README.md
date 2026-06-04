@@ -82,7 +82,7 @@ Legend: ✅ ships and works · ⚠️ ships but conflicts with a built-in · �
 
 | Difference            | Detail |
 | --------------------- | ------ |
-| **CRLF line endings** | Windows text files often use CRLF (`\r\n`). Most utilities handle this transparently, but pattern matching with `$` and exact byte counts can be affected. |
+| **CRLF line endings** | Windows text files often use CRLF (`\r\n`). Most utilities handle this transparently, but byte-oriented behavior can still observe the `\r`; for example, `uniq` may treat the final line as different from a preceding duplicate if the input uses CRLF and the final line has no trailing newline. |
 | **No `/dev/null`**    | Use `NUL` instead, for example `find . -name "*.log" > NUL` |
 | **No POSIX signals**  | Signals such as `SIGHUP`, `SIGPIPE`, and `SIGUSR` aren't available. `Ctrl+C` (`SIGINT`) works as expected. |
 | **Path separators**   | Both `/` and `\` are accepted. Some utilities produce `\`-separated output, which can affect downstream piping. |
