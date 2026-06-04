@@ -36,8 +36,8 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Tasks]
 Name: "addtopath"; Description: "Add to system &PATH"
-Name: "corefind"; Description: "find (may break Batch scripts)"; GroupDescription: "Prefer GNU- over DOS-style behavior when the invocation is ambiguous for:"
-Name: "coresort"; Description: "sort (may break non-UTF8 Batch scripts)"; GroupDescription: "Prefer GNU- over DOS-style behavior when the invocation is ambiguous for:"
+Name: "corefind"; Description: "find (may break Batch scripts)"; GroupDescription: "Prefer Coreutils- over DOS-style behavior when the invocation is ambiguous for:"
+Name: "coresort"; Description: "sort (may break non-UTF8 Batch scripts)"; GroupDescription: "Prefer Coreutils- over DOS-style behavior when the invocation is ambiguous for:"
 
 [Files]
 Source: "src\pwsh-install.ps1"; DestDir: "{app}"; Flags: notimestamp ignoreversion
