@@ -10,7 +10,7 @@ $script:__COREUTILS__ = [System.Collections.Generic.HashSet[string]]::new(
         'head', 'hostname', 'join', 'la', 'link',
         'ln', 'ls', 'md5sum', 'mkdir', 'mktemp',
         'mv', 'nl', 'nproc', 'numfmt', 'od',
-        'pathchk', 'pr', 'printenv', 'printf', 'ptx',
+        'pathchk', 'pr', 'printenv', 'printf', 'ps', 'ptx',
         'pwd', 'readlink', 'realpath', 'rm', 'rmdir',
         'seq', 'sha1sum', 'sha224sum', 'sha256sum', 'sha384sum',
         'sha512sum', 'shuf', 'sleep', 'sort', 'split',
