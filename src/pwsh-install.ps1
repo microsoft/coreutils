@@ -102,7 +102,7 @@ function Update-PowerShellProfile([string]$Path, [bool] $Install, [bool] $UseBom
     }
 }
 
-function Get-MsiPwshInstalls {
+function Get-MsiPwshProfilePaths {
     Get-ChildItem -LiteralPath 'HKLM:\SOFTWARE\Microsoft\PowerShellCore\InstalledVersions' -ErrorAction Ignore | ForEach-Object {
         $props = Get-ItemProperty -LiteralPath $_.PSPath -ErrorAction Ignore
         if (!$props -or !$props.PSObject.Properties['InstallLocation'] -or !$props.PSObject.Properties['SemanticVersion']) {
@@ -120,10 +120,7 @@ function Get-MsiPwshInstalls {
             return
         }
 
-        [PSCustomObject]@{
-            InstallLocation  = $props.InstallLocation
-            ProfilePath = Join-Path $props.InstallLocation 'Microsoft.PowerShell_profile.ps1'
-        }
+        Join-Path $props.InstallLocation 'Microsoft.PowerShell_profile.ps1'
     }
 }
 
@@ -210,8 +207,8 @@ function Get-ProfilePlan([bool] $Install, [string]$Scope) {
         return $obj
     }
 
-    foreach ($i in Get-MsiPwshInstalls) {
-        $entry = Add $i.ProfilePath
+    foreach ($profilePath in Get-MsiPwshProfilePaths) {
+        $entry = Add $profilePath
         if ($allUsersInstall) {
             $entry.Install = $true
         }
