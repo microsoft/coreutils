@@ -1,0 +1,20 @@
+[package]
+name = "ntlsof"
+edition = "2024"
+license = "MIT"
+repository = "https://github.com/microsoft/coreutils"
+rust-version = "1.88.0"
+version = "0.0.0"
+publish = false
+
+[dependencies]
+clap = { version = "4.5", features = ["wrap_help", "cargo", "color"] }
+uucore = { path = "../coreutils/src/uucore" }
+
+[dependencies.windows-sys]
+version = "*"
+features = [
+    "Win32_Foundation",
+    "Win32_Storage_FileSystem",
+    "Win32_System_Threading",
+]
