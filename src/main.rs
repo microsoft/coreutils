@@ -19,7 +19,7 @@ use itertools::Itertools as _;
 use uucore::display::Quotable as _;
 use uucore::{Args, error::strip_errno, locale};
 use windows_sys::Win32::Globalization::CP_UTF8;
-use windows_sys::Win32::System::Console::{GetConsoleOutputCP, SetConsoleOutputCP};
+use windows_sys::Win32::System::Console;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -61,7 +61,7 @@ fn main() {
     // The good news is that this just so happens to not negatively affect ntfind,
     // because through ulib it incorrectly checks the input CP instead of the output one.
     // ntsort just hardcodes to CP_OEMCP, so it also isn't affected.
-    let _restore_cp = set_console_cp_utf8();
+    set_console_modes();
 
     let utils = util_map();
     let mut args = uucore::args_os();
@@ -236,25 +236,31 @@ fn get_canonical_util_name(util_name: &str) -> &str {
     }
 }
 
-fn set_console_cp_utf8() -> RestoreConsoleCp {
-    let mut cp = unsafe { GetConsoleOutputCP() };
-    if cp == CP_UTF8 {
-        cp = 0;
-    }
+/// Sets the console code page and output modes.
+///
+/// It currently doesn't bother to restore the original values on exit, because coreutils
+/// relies on process::exit() and there are no exit hooks. It could be fixed if anyone ever
+/// complains about it (and as always, it's probably going to be about ShiftJIS again).
+///
+/// Technically this should also set the input mode, but
+/// since we don't clean up on exit, that'd be quite risky.
+fn set_console_modes() {
+    unsafe {
+        let cp = Console::GetConsoleOutputCP();
+        if cp != 0 && cp != CP_UTF8 {
+            Console::SetConsoleOutputCP(CP_UTF8);
+        }
 
-    if cp != 0 {
-        unsafe { SetConsoleOutputCP(CP_UTF8) };
-    }
+        let stdout = Console::GetStdHandle(Console::STD_OUTPUT_HANDLE);
+        let mut stdout_mode = 0;
 
-    RestoreConsoleCp(cp)
-}
-
-struct RestoreConsoleCp(u32);
-
-impl Drop for RestoreConsoleCp {
-    fn drop(&mut self) {
-        if self.0 != 0 {
-            unsafe { SetConsoleOutputCP(self.0) };
+        const EXPECTED_OUTPUT_MODE: u32 = Console::ENABLE_PROCESSED_OUTPUT
+            | Console::ENABLE_WRAP_AT_EOL_OUTPUT
+            | Console::ENABLE_VIRTUAL_TERMINAL_PROCESSING;
+        if Console::GetConsoleMode(stdout, &raw mut stdout_mode) != 0
+            && stdout_mode != EXPECTED_OUTPUT_MODE
+        {
+            Console::SetConsoleMode(stdout, EXPECTED_OUTPUT_MODE);
         }
     }
 }
