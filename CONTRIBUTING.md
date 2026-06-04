@@ -26,3 +26,10 @@ When changing a utility's behavior, prefer landing the change in the relevant
 upstream project first and then updating the submodule here. Windows-specific
 glue, packaging, and the multi-call binary wrapper live in this repo and are
 fair game for direct PRs.
+
+## Windows-native commands
+
+For Windows-native commands that are not directly provided by the upstream
+submodules, see [Windows-native command notes](docs/windows-native-commands.md)
+before opening an implementation PR. In general, please open an issue first so
+the command scope and option support can be agreed on.
