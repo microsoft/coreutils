@@ -70,7 +70,7 @@ Legend: ✅ ships and works · ⚠️ ships but conflicts with a built-in · �
 | `rm`       |  ✅  |       ⚠️        | |
 | `rmdir`    |  ⚠️  |       ⚠️        | |
 | `sleep`    |  ✅  |       ⚠️        | |
-| `sort`     |  ✅  |       ✅        | Integrated port of the original DOS command |
+| `sort`     |  ✅  |       ⚠️        | Integrated port of the original DOS command |
 | `tee`      |  ✅  |       ⚠️        | |
 | `timeout`  |  🛑  |       🛑        | Relies on `kill`'s functionality |
 | `uptime`   |  ✅  |       ⚠️        | |
