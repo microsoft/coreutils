@@ -71,17 +71,19 @@ fn main() {
         usage(&utils, "<unknown binary name>");
         process::exit(0);
     });
+    let binary_as_util_lookup = normalize_windows_executable_name(binary_as_util);
+    let binary_as_util_lookup = binary_as_util_lookup.as_ref();
 
     // binary name ends with util name?
-    let is_coreutils = binary_as_util.ends_with("utils");
+    let is_coreutils = binary_as_util_lookup.ends_with("utils");
     let matched_util = utils
         .keys()
-        .filter(|&&u| binary_as_util.ends_with(u) && !is_coreutils)
+        .filter(|&&u| binary_as_util_lookup.ends_with(u) && !is_coreutils)
         .max_by_key(|u| u.len()); //Prefer stty more than tty. *utils is not ls
 
     let util_name = if let Some(&util) = matched_util {
         Some(OsString::from(util))
-    } else if is_coreutils || binary_as_util.ends_with("box") {
+    } else if is_coreutils || binary_as_util_lookup.ends_with("box") {
         // todo: Remove support of "*box" from binary
         uucore::set_utility_is_second_arg();
         args.next()
@@ -190,6 +192,14 @@ fn binary_path(args: &mut impl Iterator<Item = OsString>) -> std::path::PathBuf 
 
 fn name(binary_path: &Path) -> Option<&str> {
     binary_path.file_stem()?.to_str()
+}
+
+fn normalize_windows_executable_name(name: &str) -> Cow<'_, str> {
+    if name.bytes().any(|b| b.is_ascii_uppercase()) {
+        Cow::Owned(name.to_ascii_lowercase())
+    } else {
+        Cow::Borrowed(name)
+    }
 }
 
 fn not_found(util: &OsStr) -> ! {
@@ -319,4 +329,19 @@ fn sort_uumain<T: Args>(args: T) -> i32 {
 
 fn sort_uu_app() -> Command {
     sort::uu_app()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn normalizes_ascii_case_for_windows_executable_names() {
+        assert_eq!(normalize_windows_executable_name("False").as_ref(), "false");
+        assert_eq!(normalize_windows_executable_name("LS").as_ref(), "ls");
+        assert_eq!(
+            normalize_windows_executable_name("coreutils").as_ref(),
+            "coreutils"
+        );
+    }
 }
