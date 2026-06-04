@@ -497,6 +497,7 @@ dependencies = [
  "uu_unlink",
  "uu_uptime",
  "uu_wc",
+ "uu_which",
  "uu_yes",
  "uucore",
  "windows-sys 0.59.0",
@@ -3441,6 +3442,14 @@ dependencies = [
  "rustix",
  "thiserror 2.0.18",
  "unicode-width 0.2.2",
+ "uucore",
+]
+
+[[package]]
+name = "uu_which"
+version = "2026.5.29"
+dependencies = [
+ "clap",
  "uucore",
 ]
 

@@ -125,6 +125,7 @@ uptime = { package = "uu_uptime", path = "deps/coreutils/src/uu/uptime" }
 findutils = { package = "findutils", path = "deps/findutils" }
 grep = { package = "uu_grep", path = "deps/grep" }
 ntfind = { package = "find", path = "deps/ntfind" }
+ntwhich = { package = "uu_which", path = "deps/ntwhich" }
 
 # For registry access in main.rs
 [dependencies.windows-sys]

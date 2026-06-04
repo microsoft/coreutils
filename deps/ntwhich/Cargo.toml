@@ -1,0 +1,21 @@
+[package]
+name = "uu_which"
+description = "which ~ locate a command in PATH"
+repository = "https://github.com/microsoft/coreutils"
+version = "2026.5.29"
+license = "MIT"
+edition = "2024"
+rust-version = "1.88.0"
+publish = false
+
+[lib]
+path = "src/which.rs"
+doctest = false
+
+[dependencies]
+clap = { version = "4.5", features = ["wrap_help", "cargo"] }
+uucore = { path = "../coreutils/src/uucore" }
+
+[[bin]]
+name = "which"
+path = "src/main.rs"
