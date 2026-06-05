@@ -13,7 +13,6 @@ AppSupportURL=https://github.com/microsoft/coreutils
 AppUpdatesURL=https://github.com/microsoft/coreutils
 SetupMutex=coreutils-windows-setup
 DefaultDirName={autopf}\coreutils
-DisableDirPage=yes
 DisableProgramGroupPage=yes
 SetupIconFile=src\coreutils.ico
 UninstallDisplayIcon={app}\coreutils.exe
