@@ -13,6 +13,7 @@ use std::ffi::{OsStr, OsString};
 use std::io::{self, Write as _, stderr};
 use std::path::{Path, PathBuf};
 use std::process;
+use std::sync::atomic::{AtomicU32, Ordering};
 
 use clap::Command;
 use itertools::Itertools as _;
@@ -61,7 +62,7 @@ fn main() {
     // The good news is that this just so happens to not negatively affect ntfind,
     // because through ulib it incorrectly checks the input CP instead of the output one.
     // ntsort just hardcodes to CP_OEMCP, so it also isn't affected.
-    let _restore_cp = set_console_cp_utf8();
+    set_console_cp_utf8();
 
     let utils = util_map();
     let mut args = uucore::args_os();
@@ -236,26 +237,36 @@ fn get_canonical_util_name(util_name: &str) -> &str {
     }
 }
 
-fn set_console_cp_utf8() -> RestoreConsoleCp {
-    let mut cp = unsafe { GetConsoleOutputCP() };
-    if cp == CP_UTF8 {
-        cp = 0;
-    }
+// Original console output code page, saved so it can be restored on exit.
+// `0` means "nothing to restore".
+static ORIGINAL_OUTPUT_CP: AtomicU32 = AtomicU32::new(0);
 
-    if cp != 0 {
-        unsafe { SetConsoleOutputCP(CP_UTF8) };
-    }
-
-    RestoreConsoleCp(cp)
+unsafe extern "C" {
+    // Registers a handler run by the CRT during `exit()`. We rely on this rather
+    // than a `Drop` guard because every code path terminates via
+    // `std::process::exit`, which skips Rust destructors but still runs C
+    // `atexit` handlers.
+    fn atexit(cb: extern "C" fn()) -> i32;
 }
 
-struct RestoreConsoleCp(u32);
+extern "C" fn restore_console_output_cp() {
+    let cp = ORIGINAL_OUTPUT_CP.swap(0, Ordering::SeqCst);
+    if cp != 0 {
+        unsafe { SetConsoleOutputCP(cp) };
+    }
+}
 
-impl Drop for RestoreConsoleCp {
-    fn drop(&mut self) {
-        if self.0 != 0 {
-            unsafe { SetConsoleOutputCP(self.0) };
-        }
+fn set_console_cp_utf8() {
+    let cp = unsafe { GetConsoleOutputCP() };
+    // Already UTF-8 (or could not be queried): nothing to change or restore.
+    if cp == CP_UTF8 || cp == 0 {
+        return;
+    }
+
+    ORIGINAL_OUTPUT_CP.store(cp, Ordering::SeqCst);
+    unsafe {
+        SetConsoleOutputCP(CP_UTF8);
+        atexit(restore_console_output_cp);
     }
 }
 
