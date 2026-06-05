@@ -108,7 +108,7 @@ Commands that exist upstream but aren't shipped here because they rely on POSIX-
 * `dd`: Perhaps useful in the future.
 * `dircolors`, `shred`, `sync`, `uname`: Not particularly useful on Windows.
 * `chcon`, `chgrp`, `chmod`, `chown`, `chroot`, `groups`, `hostid`, `id`, `install`,
-  `logname`, `mkfifo`, `mknod`, `nice`, `nohup`, `pathchk`, `pinky`, `runcon`, `stdbuf`,
+  `logname`, `mkfifo`, `mknod`, `nice`, `nohup`, `pinky`, `runcon`, `stdbuf`,
   `stty`, `tty`, `users`, `who`: POSIX-only concepts unavailable on Windows.
 
 <br/>
