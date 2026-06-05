@@ -5,6 +5,8 @@
 <h3 align="center">
   <a href="#install">Install</a>
   <span> · </span>
+  <a href="#project-scope">Project scope</a>
+  <span> · </span>
   <a href="#shell-conflicts">Shell conflicts</a>
   <span> · </span>
   <a href="#windows-caveats">Windows caveats</a>
@@ -23,6 +25,19 @@ way, so existing scripts carry over without translation.
 Each command supports the standard `--help` flag for full syntax and options.
 
 **This project is in preview.**
+
+<br/>
+
+## Project scope
+
+This project ships Unix-style command-line utilities for native Windows use,
+mostly from `uutils/coreutils`, `uutils/findutils`, and `uutils/grep`. We may
+also include small Windows-native commands when they match tools that are
+commonly available by default on Linux or macOS and are useful in scripts or
+normal shell use. Large interactive tools are out of scope for now.
+
+See [`CONTRIBUTING.md`](./CONTRIBUTING.md#project-scope) for the full scope
+guidelines.
 
 <br/>
 
