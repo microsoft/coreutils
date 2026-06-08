@@ -347,7 +347,7 @@ begin
             'Only the profile of the user running this installer will be modified. ' +
             'Other accounts on this machine will each need to re-run the installer (or pick the all-users option) to get it.' + #13#10#13#10 +
             'Continue with the current-user installation?';
-        if MsgBox(Msg, mbConfirmation, MB_YESNO) <> IDYES then
+        if SuppressibleMsgBox(Msg, mbConfirmation, MB_YESNO, IDYES) <> IDYES then
             Result := False;
     end;
 end;
