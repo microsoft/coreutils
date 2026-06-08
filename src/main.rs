@@ -12,14 +12,21 @@ use std::cmp;
 use std::ffi::{OsStr, OsString};
 use std::io::{self, Write as _, stderr};
 use std::path::{Path, PathBuf};
-use std::process;
+use std::sync::atomic::AtomicU32;
 
 use clap::Command;
 use itertools::Itertools as _;
 use uucore::display::Quotable as _;
+use uucore::windows_sys::Win32::System::Threading::GetCurrentProcess;
 use uucore::{Args, error::strip_errno, locale};
 use windows_sys::Win32::Globalization::CP_UTF8;
 use windows_sys::Win32::System::Console;
+use windows_sys::Win32::System::Threading::TerminateProcess;
+
+unsafe extern "C" {
+    fn atexit(cb: extern "C" fn()) -> i32;
+    unsafe fn ntsort_main(argc: i32, argv: *const *const u8) -> i32;
+}
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -51,7 +58,7 @@ Currently defined functions:
         && e.kind() != io::ErrorKind::BrokenPipe
     {
         let _ = writeln!(io::stderr(), "coreutils: {}", strip_errno(&e));
-        process::exit(1);
+        exit(1);
     }
 }
 
@@ -69,7 +76,7 @@ fn main() {
     let binary = binary_path(&mut args);
     let binary_as_util = name(&binary).unwrap_or_else(|| {
         usage(&utils, "<unknown binary name>");
-        process::exit(0);
+        exit(0);
     });
 
     // binary name ends with util name?
@@ -100,7 +107,7 @@ fn main() {
                 // we should fail with additional args https://github.com/uutils/coreutils/issues/11383#issuecomment-4082564058
                 if args.next().is_some() {
                     let _ = writeln!(io::stderr(), "coreutils: invalid argument");
-                    process::exit(1);
+                    exit(1);
                 }
                 let mut out = io::stdout().lock();
                 for util in utils.keys() {
@@ -108,19 +115,19 @@ fn main() {
                         && e.kind() != io::ErrorKind::BrokenPipe
                     {
                         let _ = writeln!(io::stderr(), "coreutils: {}", strip_errno(&e));
-                        process::exit(1);
+                        exit(1);
                     }
                 }
-                process::exit(0);
+                exit(0);
             }
             "--version" | "-V" => {
                 if let Err(e) = writeln!(io::stdout(), "coreutils {VERSION} (multi-call binary)")
                     && e.kind() != io::ErrorKind::BrokenPipe
                 {
                     let _ = writeln!(io::stderr(), "coreutils: {}", strip_errno(&e));
-                    process::exit(1);
+                    exit(1);
                 }
-                process::exit(0);
+                exit(0);
             }
             // Not a special command: fallthrough to calling a util
             _ => {}
@@ -134,7 +141,7 @@ fn main() {
                 // Could be something like:
                 // #[cfg(not(feature = "only_english"))]
                 setup_localization_or_exit(util);
-                process::exit(uumain(vec![util_os].into_iter().chain(args)));
+                exit(uumain(vec![util_os].into_iter().chain(args)));
             }
             None => {
                 if util == "--help" || util == "-h" {
@@ -153,13 +160,13 @@ fn main() {
                                         .chain(args),
                                 );
                                 io::stdout().flush().expect("could not flush stdout");
-                                process::exit(code);
+                                exit(code);
                             }
                             None => not_found(&util_os),
                         }
                     }
                     usage(&utils, binary_as_util);
-                    process::exit(0);
+                    exit(0);
                 } else if util.starts_with('-') {
                     // Argument looks like an option but wasn't recognized
                     unrecognized_option(binary_as_util, &util_os);
@@ -176,7 +183,7 @@ fn main() {
         } else {
             let _ = writeln!(io::stderr(), "coreutils: missing argument");
         }
-        process::exit(1);
+        exit(1);
     }
 }
 
@@ -198,7 +205,7 @@ fn not_found(util: &OsStr) -> ! {
         "coreutils: unknown program '{}'",
         util.maybe_quote()
     );
-    process::exit(1);
+    exit(1);
 }
 
 fn unrecognized_option(binary_name: &str, option: &OsStr) -> ! {
@@ -207,7 +214,7 @@ fn unrecognized_option(binary_name: &str, option: &OsStr) -> ! {
         "{binary_name}: unrecognized option '{}'",
         option.to_string_lossy()
     );
-    process::exit(1);
+    exit(1);
 }
 
 fn setup_localization_or_exit(util_name: &str) {
@@ -220,7 +227,7 @@ fn setup_localization_or_exit(util_name: &str) {
             } => eprintln!("Localization parse error at {snippet}: {err_msg}"),
             other => eprintln!("Could not init the localization system: {other}"),
         }
-        process::exit(99)
+        exit(99)
     });
 }
 
@@ -236,37 +243,69 @@ fn get_canonical_util_name(util_name: &str) -> &str {
     }
 }
 
+const EXPECTED_OUTPUT_MODE: u32 = Console::ENABLE_PROCESSED_OUTPUT
+    | Console::ENABLE_WRAP_AT_EOL_OUTPUT
+    | Console::ENABLE_VIRTUAL_TERMINAL_PROCESSING;
+
+static ORIGINAL_OUTPUT_CP: AtomicU32 = AtomicU32::new(CP_UTF8);
+static ORIGINAL_OUTPUT_MODE: AtomicU32 = AtomicU32::new(EXPECTED_OUTPUT_MODE);
+
 /// Sets the console code page and output modes.
-///
-/// It currently doesn't bother to restore the original values on exit, because coreutils
-/// relies on process::exit() and there are no exit hooks. It could be fixed if anyone ever
-/// complains about it (and as always, it's probably going to be about ShiftJIS again).
-///
-/// Technically this should also set the input mode, but
-/// since we don't clean up on exit, that'd be quite risky.
 fn set_console_modes() {
     unsafe {
-        let cp = Console::GetConsoleOutputCP();
-        if cp != 0 && cp != CP_UTF8 {
+        let mut cp = Console::GetConsoleOutputCP();
+        if cp == 0 {
+            cp = CP_UTF8;
+        }
+        if cp != CP_UTF8 {
             Console::SetConsoleOutputCP(CP_UTF8);
         }
 
         let stdout = Console::GetStdHandle(Console::STD_OUTPUT_HANDLE);
-        let mut stdout_mode = 0;
-
-        const EXPECTED_OUTPUT_MODE: u32 = Console::ENABLE_PROCESSED_OUTPUT
-            | Console::ENABLE_WRAP_AT_EOL_OUTPUT
-            | Console::ENABLE_VIRTUAL_TERMINAL_PROCESSING;
-        if Console::GetConsoleMode(stdout, &raw mut stdout_mode) != 0
-            && stdout_mode != EXPECTED_OUTPUT_MODE
-        {
+        let mut mode = 0;
+        if Console::GetConsoleMode(stdout, &raw mut mode) == 0 {
+            mode = EXPECTED_OUTPUT_MODE;
+        }
+        if mode != EXPECTED_OUTPUT_MODE {
             Console::SetConsoleMode(stdout, EXPECTED_OUTPUT_MODE);
+        }
+
+        ORIGINAL_OUTPUT_CP.store(cp, std::sync::atomic::Ordering::Relaxed);
+        ORIGINAL_OUTPUT_MODE.store(mode, std::sync::atomic::Ordering::Relaxed);
+
+        atexit(restore_console_modes);
+    }
+}
+
+extern "C" fn restore_console_modes() {
+    unsafe {
+        let cp = ORIGINAL_OUTPUT_CP.load(std::sync::atomic::Ordering::Relaxed);
+        let mode = ORIGINAL_OUTPUT_MODE.load(std::sync::atomic::Ordering::Relaxed);
+
+        if cp != CP_UTF8 {
+            Console::SetConsoleOutputCP(cp);
+        }
+
+        if mode != EXPECTED_OUTPUT_MODE {
+            let stdout = Console::GetStdHandle(Console::STD_OUTPUT_HANDLE);
+            Console::SetConsoleMode(stdout, mode);
         }
     }
 }
 
-unsafe extern "C" {
-    unsafe fn ntsort_main(argc: i32, argv: *const *const u8) -> i32;
+/// Restores the console modes and then exits.
+///
+/// NOTE: Regular uutils/coreutils calls std::process::exit, which flushes stdout buffers.
+/// However, the utils are designed such that they can be used in-proc so
+/// if they didn't flush themselves, they would be considered buggy anyway.
+///
+/// TerminateProcess is used because it is technically superior to ExitProcess.
+fn exit(code: i32) -> ! {
+    unsafe {
+        restore_console_modes();
+        TerminateProcess(GetCurrentProcess(), code as u32);
+        std::hint::unreachable_unchecked();
+    }
 }
 
 fn find_uumain<T: Args>(args: T) -> i32 {
@@ -317,7 +356,12 @@ fn sort_uumain<T: Args>(args: T) -> i32 {
             arg.push("\0");
         }
         let ptrs: Vec<_> = args.iter().map(|v| v.as_encoded_bytes().as_ptr()).collect();
-        unsafe { ntsort_main(ptrs.len() as i32, ptrs.as_ptr()) }
+
+        unsafe {
+            // NOTE: ntsort calls exit() on /? and on error.
+            atexit(restore_console_modes);
+            ntsort_main(ptrs.len() as i32, ptrs.as_ptr())
+        }
     } else {
         sort::uumain(args.into_iter())
     }
