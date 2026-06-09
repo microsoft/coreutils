@@ -38,6 +38,11 @@ Or grab the latest build from our [Release Page](https://github.com/microsoft/co
 
 <br/>
 
+## Creating custom alias
+
+* PowerShell: Set-Alias ll 'ls' or a function in your $PROFILE for arguments, e.g. `function ll { ls -la --color=auto @args }`
+* CMD: doskey ll=ls -la $*
+
 ## Shell conflicts
 
 > [!NOTE]
