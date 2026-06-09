@@ -34,15 +34,6 @@ $script:__COREUTILS_CMD_PREDICATE__ = [System.Func[System.Management.Automation.
     param($n) $n -is [System.Management.Automation.Language.CommandAst]
 }
 
-$script:__COREUTILS_READLINE_HAS_LAST_STATUS__ = [Microsoft.PowerShell.PSConsoleReadLine].GetMethod(
-    'ReadLine',
-    [type[]]@(
-        [System.Management.Automation.Runspaces.Runspace],
-        [System.Management.Automation.EngineIntrinsics],
-        [System.Nullable[bool]]
-    )
-) -ne $null
-
 $script:__COREUTILS_ARG_SPECIAL__ = [char[]] @("'", '"', '`', '$')
 
 # Wrap arguments into quotes. By being a function we can properly handle $variables.
@@ -109,12 +100,7 @@ function PSConsoleHostReadLine {
 
     $lastRunStatus = $?
     Microsoft.PowerShell.Core\Set-StrictMode -Off
-    $line = if ($script:__COREUTILS_READLINE_HAS_LAST_STATUS__) {
-        [Microsoft.PowerShell.PSConsoleReadLine]::ReadLine($host.Runspace, $ExecutionContext, $lastRunStatus)
-    }
-    else {
-        [Microsoft.PowerShell.PSConsoleReadLine]::ReadLine($host.Runspace, $ExecutionContext)
-    }
+    $line = [Microsoft.PowerShell.PSConsoleReadLine]::ReadLine($host.Runspace, $ExecutionContext, $lastRunStatus)
 
     # If the line contains no coreutils name, we don't need to parse the AST at all.
     if (-not $script:__COREUTILS_FAST_SKIP__.IsMatch($line)) {
