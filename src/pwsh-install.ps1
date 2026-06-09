@@ -37,6 +37,25 @@ function Remove-FileIfExists([string]$Path) {
     }
 }
 
+function Get-ProfileWritePath([string]$Path) {
+    $item = Get-Item -LiteralPath $Path -Force -ErrorAction Ignore
+    if (!$item -or $item.LinkType -ne 'SymbolicLink') {
+        return $Path
+    }
+
+    $target = $item.Target
+    if (!$target) {
+        return $Path
+    }
+    if ($target -is [array]) {
+        $target = $target[0]
+    }
+    if (![System.IO.Path]::IsPathRooted($target)) {
+        $target = [System.IO.Path]::GetFullPath((Join-Path (Split-Path -LiteralPath $Path) $target))
+    }
+    return $target
+}
+
 function Get-InjectedSection([string]$CmdDir) {
     $templatePath = Join-Path $PSScriptRoot 'pwsh-install-template.ps1'
     $template = Get-Content -LiteralPath $templatePath -Raw
@@ -55,8 +74,14 @@ function Update-PowerShellProfile([string]$Path, [bool] $Install, [bool] $UseBom
         return
     }
 
+    $writePath = Get-ProfileWritePath $Path
+    $isSymlink = $writePath -ne $Path
+    if ($Install -and $isSymlink) {
+        [void](New-Item -Path (Split-Path -LiteralPath $writePath) -ItemType Directory -Force)
+    }
+
     # Get-Content uses .NET's StreamReader, so it auto-detects UTF-8/UTF-16 with BOM.
-    $text = Get-Content -LiteralPath $Path -Raw -ErrorAction Ignore
+    $text = Get-Content -LiteralPath $writePath -Raw -ErrorAction Ignore
     if (!$text) {
         $text = ''
     }
@@ -83,7 +108,12 @@ function Update-PowerShellProfile([string]$Path, [bool] $Install, [bool] $UseBom
     }
 
     if (!$text) {
-        Remove-FileIfExists $Path
+        if ($isSymlink) {
+            [System.IO.File]::WriteAllText($writePath, '', [System.Text.UTF8Encoding]::new($UseBom))
+        }
+        else {
+            Remove-FileIfExists $Path
+        }
         return
     }
 
@@ -91,10 +121,10 @@ function Update-PowerShellProfile([string]$Path, [bool] $Install, [bool] $UseBom
     $encoding = [System.Text.UTF8Encoding]::new($UseBom)
 
     # Atomic write: stage as .new, then replace.
-    $newPath = "$Path.new"
+    $newPath = "$writePath.new"
     try {
         [System.IO.File]::WriteAllText($newPath, $text, $encoding)
-        [System.IO.File]::Move($newPath, $Path, $true)
+        [System.IO.File]::Move($newPath, $writePath, $true)
     }
     catch {
         Remove-Item -LiteralPath $newPath -Force -ErrorAction Ignore
