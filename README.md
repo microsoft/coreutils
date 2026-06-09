@@ -44,9 +44,8 @@ Or grab the latest build from our [Release Page](https://github.com/microsoft/co
 > Any command not mentioned is included in this suite. The following only lists conflicts.
 
 > [!WARNING]
-> PowerShell 7.4 or newer is required. PowerShell 7.6 or newer is recommended
-> for native `~` expansion before external commands; on older 7.x versions,
-> use `$HOME` instead of `~`.
+> PowerShell 7.4 or later is required.
+> PowerShell 7.6 or later is recommended for `~` support.
 
 Several commands share names with built-ins in CMD and PowerShell. Whether the Coreutils
 version runs depends on the shell, the PATH order, and (for PowerShell) the alias table.
@@ -97,12 +96,9 @@ The installer integrates itself with interactive PowerShell sessions via `PSRead
 It ensures that quoted expression behave somewhat like they do under UNIX shells or CMD:
 `echo *.txt` will then print a number of file names, while `echo '*.txt'` will print "*.txt" literally.
 
-There are some shortcomings, however:
+There are two shortcomings, however:
 * PowerShell's escape character is still <code>\`</code>, not <code>\\</code><br>
   While you may write `find . \( -foo -bar \)` with Bash, you still need to write ``find . `( -foo -bar `)`` in PowerShell.
-* PowerShell 7.6 or newer is needed for stable native `~` expansion before
-  external commands. On older 7.x versions, commands such as `ls ~` may pass
-  `~` literally; use `$HOME` instead.
 * `Get-Command ls`, `Get-Help ls`, etc., will still show `ls`, etc., as builtin commands<br>
   Due to limitations around `PSNativeCommandPreserveBytePipe` we cannot integrate ourselves in a more robust way with PowerShell.
 
