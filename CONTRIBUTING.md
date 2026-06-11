@@ -11,7 +11,11 @@ Please open a new issue for any feature requests you have in mind.  Since most o
 
 ## Adopting Commands
 
-We'll adopt a command by command basis. Some command make sense on Windows, others do not.  Please create a feature request for an additional commands.  As stated above, most behavior is driven from upstream.
+We'll adopt a command by command basis. Some command make sense on Windows, others do not.  A guiding principle is if they have an equivalent on either Linux or macOS, are commonly installed by default, and commonly used: Our answer will be `Yes`.
+
+For instance, pbcopy and pbpaste from macOS would be 100% acceptable
+
+Please create a feature request for an additional commands.  As stated above, most behavior is driven from upstream.
 
 ## Code changes
 
