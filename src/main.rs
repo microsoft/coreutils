@@ -38,7 +38,7 @@ fn usage<T>(utils: &UtilityMap<T>, name: &str) {
     let indent_list = textwrap::indent(&textwrap::fill(&display_list, width), "    ");
     let common_core_string = "
 Functions:
-      '<uutils>' [arguments...]
+      '<coreutils>' [arguments...]
 
 ";
     let s = format!(
