@@ -61,6 +61,8 @@ fn generate_uutils_map() {
         entries.push(("sort".into(), "(sort_uumain, sort_uu_app)".into()));
     }
 
+    entries.push(("lsof".into(), "(ntlsof::uumain, ntlsof::uu_app)".into()));
+
     entries.sort();
 
     let mut phf_map = phf_codegen::OrderedMap::new();

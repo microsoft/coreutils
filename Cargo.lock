@@ -418,6 +418,7 @@ dependencies = [
  "find",
  "findutils",
  "itertools",
+ "ntlsof",
  "phf",
  "phf_codegen",
  "regex",
@@ -1652,6 +1653,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "42b8cfee0e339a0337359f3c88165702ac6e600dc01c0cc9579a92d62b08477a"
 dependencies = [
  "bitflags 2.11.1",
+]
+
+[[package]]
+name = "ntlsof"
+version = "0.0.0"
+dependencies = [
+ "clap",
+ "uucore",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
