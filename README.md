@@ -43,6 +43,10 @@ Or grab the latest build from our [Release Page](https://github.com/microsoft/co
 > [!NOTE]
 > Any command not mentioned is included in this suite. The following only lists conflicts.
 
+> [!NOTE]
+> You can remove additional utilities using `coreutils-manager disable <utility name>`.
+> See `coreutils-manager --help` for other management commands.
+
 > [!WARNING]
 > PowerShell 7.4 or later is required.
 > PowerShell 7.6 or later is recommended for `~` support.

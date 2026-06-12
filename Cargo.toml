@@ -22,6 +22,8 @@ uucore = { path = "deps/coreutils/src/uucore" }
 uucore_procs = { path = "deps/coreutils/src/uucore_procs" }
 
 [dependencies]
+# Dependency versions match those used in deps/coreutils.
+wild = "2.2.1"
 clap = { version = "4.5", features = ["wrap_help", "cargo", "color"] }
 itertools = "0.14"
 phf = "0.13"
@@ -130,8 +132,14 @@ ntfind = { package = "find", path = "deps/ntfind" }
 [dependencies.windows-sys]
 version = "*"
 features = [
+    "Win32_Foundation",
+    "Win32_Security_Cryptography",
+    "Win32_Storage_FileSystem",
     "Win32_System_Console",
+    "Win32_System_Pipes",
     "Win32_System_Registry",
+    "Win32_UI_Shell",
+    "Win32_UI_WindowsAndMessaging",
 ]
 
 [build-dependencies]

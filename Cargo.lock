@@ -499,6 +499,7 @@ dependencies = [
  "uu_wc",
  "uu_yes",
  "uucore",
+ "wild",
  "windows-sys 0.59.0",
  "winresource",
 ]

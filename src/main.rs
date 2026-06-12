@@ -5,6 +5,7 @@
 // Microsoft-authored changes, which Microsoft makes available to uutils
 // under the uutils MIT License for upstream incorporation. See NOTICE.md.
 
+mod manager;
 mod nthelpers;
 
 use std::borrow::Cow;
@@ -16,9 +17,10 @@ use std::sync::atomic::AtomicU32;
 
 use clap::Command;
 use itertools::Itertools as _;
+use uucore::Args;
 use uucore::display::Quotable as _;
 use uucore::windows_sys::Win32::System::Threading::GetCurrentProcess;
-use uucore::{Args, error::strip_errno, locale};
+use uucore::{error::strip_errno, locale};
 use windows_sys::Win32::Globalization::CP_UTF8;
 use windows_sys::Win32::System::Console;
 use windows_sys::Win32::System::Threading::TerminateProcess;
@@ -28,9 +30,13 @@ unsafe extern "C" {
     unsafe fn ntsort_main(argc: i32, argv: *const *const u8) -> i32;
 }
 
-const VERSION: &str = env!("CARGO_PKG_VERSION");
-
 include!(concat!(env!("OUT_DIR"), "/uutils_map.rs"));
+
+// While uucore::Args is a trait, this is the actual type it'll resolve to in the end.
+type ArgsType = std::iter::Chain<std::vec::IntoIter<std::ffi::OsString>, wild::ArgsOs>;
+
+const VERSION: &str = env!("CARGO_PKG_VERSION");
+const UTIL_MAP: UtilityMap<ArgsType> = util_map();
 
 fn usage<T>(utils: &UtilityMap<T>, name: &str) {
     let display_list = utils.keys().copied().join(", ");
@@ -70,18 +76,19 @@ fn main() {
     // ntsort just hardcodes to CP_OEMCP, so it also isn't affected.
     set_console_modes();
 
-    let utils = util_map();
-    let mut args = uucore::args_os();
+    // `wild::args_os()` is what `uucore::args_os()` uses under the hood.
+    // By using it directly we avoid duplicating all arg strings.
+    let mut args = wild::args_os();
 
     let binary = binary_path(&mut args);
     let binary_as_util = name(&binary).unwrap_or_else(|| {
-        usage(&utils, "<unknown binary name>");
+        usage(&UTIL_MAP, "<unknown binary name>");
         exit(0);
     });
 
     // binary name ends with util name?
     let is_coreutils = binary_as_util.ends_with("utils");
-    let matched_util = utils
+    let matched_util = UTIL_MAP
         .keys()
         .filter(|&&u| binary_as_util.ends_with(u) && !is_coreutils)
         .max_by_key(|u| u.len()); //Prefer stty more than tty. *utils is not ls
@@ -110,7 +117,7 @@ fn main() {
                     exit(1);
                 }
                 let mut out = io::stdout().lock();
-                for util in utils.keys() {
+                for util in UTIL_MAP.keys() {
                     if let Err(e) = writeln!(out, "{util}")
                         && e.kind() != io::ErrorKind::BrokenPipe
                     {
@@ -133,7 +140,7 @@ fn main() {
             _ => {}
         }
 
-        match utils.get(util) {
+        match UTIL_MAP.get(util) {
             Some(&(uumain, _)) => {
                 // TODO: plug the deactivation of the translation
                 // and load the English strings directly at compilation time in the
@@ -151,7 +158,7 @@ fn main() {
                             not_found(&util_os)
                         };
 
-                        match utils.get(util) {
+                        match UTIL_MAP.get(util) {
                             Some(&(uumain, _)) => {
                                 setup_localization_or_exit(util);
                                 let code = uumain(
@@ -165,7 +172,7 @@ fn main() {
                             None => not_found(&util_os),
                         }
                     }
-                    usage(&utils, binary_as_util);
+                    usage(&UTIL_MAP, binary_as_util);
                     exit(0);
                 } else if util.starts_with('-') {
                     // Argument looks like an option but wasn't recognized
@@ -179,7 +186,7 @@ fn main() {
         // GNU just fails, but busybox tests needs usage
         // todo: patch the test suite instead
         if binary_as_util.ends_with("box") {
-            usage(&utils, binary_as_util);
+            usage(&UTIL_MAP, binary_as_util);
         } else {
             let _ = writeln!(io::stderr(), "coreutils: missing argument");
         }

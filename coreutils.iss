@@ -93,25 +93,24 @@ end;
 procedure CreateHardlinks;
 var
     Output: TExecOutput;
-    Name: String;
-    ResultCode, I: Integer;
+    Detail: String;
+    ResultCode: Integer;
 begin
     ForceDirectories(g_AppBinDirPath);
     ForceDirectories(g_AppCmdDirPath);
 
-    if (not ExecAndCaptureOutput(g_CoreutilsExePath, '--list', '', SW_SHOWNORMAL, ewWaitUntilTerminated, ResultCode, Output)) or (ResultCode <> 0) then
-        RaiseException('Failed to execute coreutils.exe --list');
-
-    for I := 0 to GetArrayLength(Output.StdOut) - 1 do
+    if (not ExecAndCaptureOutput(g_CoreutilsExePath, 'coreutils-manager refresh', '', SW_SHOWNORMAL, ewWaitUntilTerminated, ResultCode, Output)) or (ResultCode <> 0) then
     begin
-        Name := Trim(Output.StdOut[I]);
-        if (Name <> '') and (Name <> '[') then
-        begin
-            if not CreateHardLink(g_AppBinDirPath + Name + '.exe', g_CoreutilsExePath, 0) then
-                RaiseException('Failed to create hardlink for ' + Name);
-            if not CreateHardLink(g_AppCmdDirPath + Name + '.cmd', g_CoreutilsExePath, 0) then
-                RaiseException('Failed to create hardlink for ' + Name);
-        end;
+        Detail := '';
+        if GetArrayLength(Output.StdErr) > 0 then
+            Detail := Output.StdErr[0]
+        else if GetArrayLength(Output.StdOut) > 0 then
+            Detail := Output.StdOut[0];
+
+        if Detail <> '' then
+            RaiseException('Failed to refresh coreutils links: ' + Detail)
+        else
+            RaiseException('Failed to refresh coreutils links');
     end;
 end;
 
