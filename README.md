@@ -75,6 +75,7 @@ Legend: ✅ ships and works · ⚠️ ships but conflicts with a built-in · �
 | `mkdir`    |  ⚠️  |       ⚠️        | |
 | `more`     |  🛑  |       🛑        | Conflicts with the built-in DOS command (consider `edit` as an alternative) |
 | `mv`       |  ✅  |       ⚠️        | |
+| `ps`       |  ✅  |       ⚠️        | Windows-native process listing |
 | `pwd`      |  ✅  |       ⚠️        | |
 | `rm`       |  ✅  |       ⚠️        | |
 | `rmdir`    |  ⚠️  |       ⚠️        | |

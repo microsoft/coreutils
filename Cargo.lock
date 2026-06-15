@@ -465,6 +465,7 @@ dependencies = [
  "uu_pr",
  "uu_printenv",
  "uu_printf",
+ "uu_ps",
  "uu_ptx",
  "uu_pwd",
  "uu_readlink",
@@ -3080,6 +3081,15 @@ dependencies = [
  "clap",
  "fluent",
  "uucore",
+]
+
+[[package]]
+name = "uu_ps"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "uucore",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
