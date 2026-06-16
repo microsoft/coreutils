@@ -1,0 +1,228 @@
+parameters:
+  - name: debug
+    displayName: Enable debug output
+    type: boolean
+    default: false
+  - name: codeSign
+    type: boolean
+    default: false
+  - name: signingIdentity
+    type: object
+    default: {}
+  - name: buildPlatforms
+    type: object
+    default:
+      - x86_64-pc-windows-msvc
+      - aarch64-pc-windows-msvc
+  - name: dependsOn
+    type: object
+    default: null
+  - name: variables
+    type: object
+    default: {}
+  - name: pool
+    type: object
+    default: []
+  - name: outerTemplateContext
+    type: object
+    default: {}
+
+jobs:
+- job: Windows
+  templateContext: ${{ parameters.outerTemplateContext }}
+  ${{ if ne(length(parameters.pool), 0) }}:
+    pool: ${{ parameters.pool }}
+  dependsOn: ${{ parameters.dependsOn }}
+  variables:
+    system.debug: ${{parameters.debug}}
+    CDP_DEFINITION_BUILD_COUNT: $[counter('', 0)]
+    NUGET_XMLDOC_MODE: none
+    # Installer .exe files end up here.
+    # More settings at https://aka.ms/obpipelines/yaml/jobs
+    ob_outputDirectory: "$(Build.SourcesDirectory)/out"
+    # For details on this cargo_target_dir setting, see:
+    # https://eng.ms/docs/more/rust/topics/onebranch-workaround
+    CARGO_TARGET_DIR: C:\cargo_target_dir
+    # RUSTC_BOOTSTRAP=1 is required to make panic-immediate-abort work.
+    RUSTC_BOOTSTRAP: 1
+    # `nuget install -ExcludeVersion` (see tools.packages.config)
+    # restores Inno Setup here.
+    InnoSetupRoot: "$(Build.SourcesDirectory)\\.tools\\Tools.InnoSetup\\tools"
+    ${{ insert }}: ${{ parameters.variables }}
+  steps:
+  - checkout: self
+    clean: true
+    fetchDepth: 1
+    fetchTags: false # Tags still result in depth > 1 fetch; we don't need them here
+    submodules: true
+    persistCredentials: True
+
+  # NOTE: Step objects have ordered keys and you MUST have "task" as the first key.
+  # Objects with ordered keys... lol
+  - task: RustInstaller@1
+    displayName: Install Rust toolchain
+    inputs:
+      rustVersion: ms-prod@llvm
+      additionalTargets: x86_64-pc-windows-msvc aarch64-pc-windows-msvc
+      # URL of an Azure Artifacts feed configured with a crates.io upstream. Must be within the current ADO collection.
+      # NOTE: Azure Artifacts support for Rust is not yet public, but it is enabled for internal ADO organizations.
+      # https://learn.microsoft.com/en-us/azure/devops/artifacts/how-to/set-up-upstream-sources?view=azure-devops
+      cratesIoFeedOverride: sparse+https://pkgs.dev.azure.com/microsoft/Dart/_packaging/uutils-installer/Cargo/index/
+      # URL of an Azure Artifacts NuGet feed configured with the mscodehub Rust feed as an upstream.
+      # * The feed must be within the current ADO collection.
+      # * The CI account, usually "Project Collection Build Service (org-name)", must have at least "Collaborator" permission.
+      # When setting up the upstream NuGet feed, use following Azure Artifacts feed locator:
+      #   azure-feed://mscodehub/Rust/Rust@Release
+      toolchainFeed: https://pkgs.dev.azure.com/microsoft/_packaging/RustTools/nuget/v3/index.json
+  - task: CargoAuthenticate@0
+    displayName: Authenticate with Azure Artifacts (cargo)
+    inputs:
+      configFile: ".cargo/release-windows-ms.toml"
+  # We recommend making a separate `cargo fetch` step, as some build systems perform
+  # fetching entirely prior to the build, and perform the build with the network disabled.
+  - script: cargo fetch --config .cargo/release-windows-ms.toml
+    displayName: Fetch crates
+  # Pull Inno Setup from the internal Azure Artifacts NuGet feed.
+  - task: NuGetAuthenticate@1
+    displayName: Authenticate with Azure Artifacts (nuget)
+  - task: NuGetCommand@2
+    displayName: Restore Inno Setup
+    inputs:
+      command: custom
+      arguments: >-
+        install $(Build.SourcesDirectory)/.pipelines/packages.config
+        -ConfigFile $(Build.SourcesDirectory)/.pipelines/nuget.config
+        -OutputDirectory $(Build.SourcesDirectory)/.tools
+        -ExcludeVersion
+        -NonInteractive
+  # Extract the package version from Cargo.toml for the app version.
+  - pwsh: |-
+      $cargoToml = Get-Content -Raw -LiteralPath Cargo.toml
+      $m = [regex]::Match($cargoToml, '(?m)^version\s*=\s*"([^"]+)"')
+      if (-not $m.Success) { throw 'Failed to extract version from Cargo.toml' }
+      $version = $m.Groups[1].Value
+      Write-Host "Coreutils version: $version"
+      Write-Host "##vso[task.setvariable variable=CoreutilsVersion]$version"
+    displayName: Extract Coreutils version
+  - ${{ each platform in parameters.buildPlatforms }}:
+      - script: cargo build --frozen --config .cargo/release-windows-ms.toml --release --bin coreutils --target ${{platform}}
+        displayName: Build ${{platform}} Release
+      - task: CopyFiles@2
+        displayName: Stage ${{platform}} coreutils.exe/.pdb
+        inputs:
+          sourceFolder: "$(CARGO_TARGET_DIR)/${{platform}}/release"
+          targetFolder: "$(Build.SourcesDirectory)/.staging/${{platform}}"
+          contents: |
+            coreutils.exe
+            coreutils.pdb
+  # Sign coreutils.exe.
+  - ${{ if eq(parameters.codeSign, true) }}:
+    - template: steps-esrp-sign-files-authenticode.yml
+      parameters:
+        displayName: Sign coreutils.exe
+        pattern: "**/coreutils.exe"
+        folder: "$(Build.SourcesDirectory)/.staging"
+        signingIdentity: ${{ parameters.signingIdentity }}
+
+  # Package the signed coreutils.exe and its coreutils.pdb into a .zip.
+  - ${{ each platform in parameters.buildPlatforms }}:
+      - pwsh: |-
+          New-Item -ItemType Directory -Force -Path $env:OB_OUTPUTDIRECTORY | Out-Null
+          $zip = Join-Path $env:OB_OUTPUTDIRECTORY "$env:OUTPUT_BASENAME.zip"
+          $staging = Join-Path $env:BUILD_SOURCESDIRECTORY ".staging\${{platform}}"
+          $pkgRoot = Join-Path $env:BUILD_SOURCESDIRECTORY ".staging\zip"
+          $pkgDir = Join-Path $pkgRoot $env:OUTPUT_BASENAME
+          New-Item -ItemType Directory -Force -Path $pkgDir | Out-Null
+          Copy-Item -Path $staging\* -Destination $pkgDir
+          & tar.exe -c -v --format=zip -f $zip -C $pkgRoot $env:OUTPUT_BASENAME
+          Write-Host "Produced $zip"
+        env:
+          OB_OUTPUTDIRECTORY: $(ob_outputDirectory)
+          ${{ if eq(platform, 'aarch64-pc-windows-msvc') }}:
+            OUTPUT_BASENAME: coreutils-$(CoreutilsVersion)-arm64
+          ${{ elseif eq(platform, 'x86_64-pc-windows-msvc') }}:
+            OUTPUT_BASENAME: coreutils-$(CoreutilsVersion)-x64
+          ${{ else }}:
+            OUTPUT_BASENAME: coreutils-$(CoreutilsVersion)-x86
+        displayName: Zip ${{platform}} coreutils.exe/.pdb
+
+  # Run ISCC once to generate the uninstaller .e32 file.
+  # Rename .e32 → .exe so the signing task recognises the extension.
+  # The .e32 is arch-independent (confirmed: same hash for x64 and arm64).
+  # ISCC exits with code 1 because the file isn't signed yet.
+  - pwsh: |-
+      $iscc = Join-Path $env:InnoSetupRoot 'ISCC.exe'
+      New-Item -ItemType Directory -Force '.signing' | Out-Null
+      $ErrorActionPreference = 'Continue'
+      & $iscc /Q `
+          "/DSignedUninstallerDir=$(Get-Location)\.signing" `
+          "/DAppVersion=$env:CORE_VERSION" `
+          "/DArchitecturesAllowed=x64os" `
+          "/DSource=$env:BUILD_SOURCESDIRECTORY\.staging\x86_64-pc-windows-msvc\coreutils.exe" `
+          /O. `
+          /Fdummy `
+          coreutils.iss
+      $ErrorActionPreference = 'Stop'
+      $e32 = Get-ChildItem '.signing\*.e32' | Select-Object -First 1
+      Write-Host "Generated uninstaller: $($e32.Name)"
+      Rename-Item $e32.FullName ($e32.FullName -replace '\.e32$', '.exe')
+      exit 0
+    env:
+      CORE_VERSION: $(CoreutilsVersion)
+    displayName: Generate unsigned uninstaller
+
+  # Sign the uninstaller exe.
+  - ${{ if eq(parameters.codeSign, true) }}:
+    - template: steps-esrp-sign-files-authenticode.yml
+      parameters:
+        displayName: Sign uninstaller
+        pattern: "*.exe"
+        folder: "$(Build.SourcesDirectory)/.signing"
+        signingIdentity: ${{ parameters.signingIdentity }}
+
+  # Rename the signed uninstaller back to .e32 such that ISCC finds it.
+  - pwsh: |-
+      Get-ChildItem '.signing\*.exe' | ForEach-Object {
+          Rename-Item $_.FullName ($_.FullName -replace '\.exe$', '.e32')
+      }
+    displayName: Rename signed .exe back to .e32
+  # Run ISCC a second time to create the installer.
+  - ${{ each platform in parameters.buildPlatforms }}:
+      - pwsh: |-
+          $iscc = Join-Path $env:InnoSetupRoot 'ISCC.exe'
+          if (-not (Test-Path -LiteralPath $iscc)) {
+              throw "ISCC.exe not found at $iscc"
+          }
+          New-Item -ItemType Directory -Force -Path $env:OB_OUTPUTDIRECTORY | Out-Null
+          & $iscc `
+              /Q `
+              "/DSignedUninstallerDir=$env:BUILD_SOURCESDIRECTORY\.signing" `
+              "/DAppVersion=$env:CORE_VERSION" `
+              "/DArchitecturesAllowed=$env:ARCH" `
+              "/DSource=$env:BUILD_SOURCESDIRECTORY\.staging\${{platform}}\coreutils.exe" `
+              "/O$env:OB_OUTPUTDIRECTORY" `
+              "/F$env:OUTPUT_BASENAME" `
+              coreutils.iss
+          if ($LASTEXITCODE -ne 0) { throw "ISCC failed with exit code $LASTEXITCODE" }
+          Write-Host "Produced $env:OB_OUTPUTDIRECTORY\$env:OUTPUT_BASENAME.exe"
+        env:
+          CORE_VERSION: $(CoreutilsVersion)
+          OB_OUTPUTDIRECTORY: $(ob_outputDirectory)
+          ${{ if eq(platform, 'aarch64-pc-windows-msvc') }}:
+            ARCH: arm64
+            OUTPUT_BASENAME: coreutils-$(CoreutilsVersion)-arm64
+          ${{ elseif eq(platform, 'x86_64-pc-windows-msvc') }}:
+            ARCH: x64os
+            OUTPUT_BASENAME: coreutils-$(CoreutilsVersion)-x64
+          ${{ else }}:
+            ARCH: x86
+            OUTPUT_BASENAME: coreutils-$(CoreutilsVersion)-x86
+        displayName: Build ${{platform}} installer
+
+  - ${{ if eq(parameters.codeSign, true) }}:
+    - template: steps-esrp-sign-files-authenticode.yml
+      parameters:
+        displayName: Sign installers
+        pattern: "coreutils-*.exe"
+        folder: "$(ob_outputDirectory)"
+        signingIdentity: ${{ parameters.signingIdentity }}
