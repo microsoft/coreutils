@@ -2,7 +2,7 @@
 // Licensed under the MIT License.
 
 // TODO: It would be cleaner to implement the entire PowerShell logic here in Rust.
-// FWIW we loose 2 things this way:
+// FWIW we lose 2 things this way:
 // * Access to `$PROFILE.CurrentUserCurrentHost`
 // * .NET's text decoding/encoding logic (including support for ACP encoding)
 
