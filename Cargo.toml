@@ -4,7 +4,7 @@ edition = "2024"
 license = "MIT"
 repository = "https://github.com/microsoft/coreutils"
 rust-version = "1.88.0"
-version = "2026.5.29"
+version = "2026.6.16"
 publish = false
 
 [profile.release]
