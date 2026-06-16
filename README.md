@@ -38,6 +38,14 @@ Or grab the latest build from our [Release Page](https://github.com/microsoft/co
 
 <br/>
 
+## Creating custom alias
+
+* PowerShell: Set-Alias ll 'ls' or a function in your $PROFILE for arguments, e.g. `function ll { ls -la --color=auto @args }`
+* CMD: doskey ll=ls -la $*
+
+> [!WARNING]
+> Using PowerShell aliases will cause binary stream compatibility. Some utilities will not work when piped (e.g. xargs, find, ...)
+
 ## Shell conflicts
 
 > [!NOTE]
@@ -97,13 +105,14 @@ Legend: ✅ ships and works · ⚠️ ships but conflicts with a built-in · �
 ### PowerShell Command Parsing
 
 The installer integrates itself with interactive PowerShell sessions via `PSReadLine`.
-It ensures that quoted expression behave somewhat like they do under UNIX shells or CMD:
+It ensures that quoted expressions behave somewhat like they do under UNIX shells or CMD:
 `echo *.txt` will then print a number of file names, while `echo '*.txt'` will print "*.txt" literally.
 
 There are two shortcomings, however:
 * PowerShell's escape character is still <code>\`</code>, not <code>\\</code><br>
   While you may write `find . \( -foo -bar \)` with Bash, you still need to write ``find . `( -foo -bar `)`` in PowerShell.
-* `Get-Command ls`, `Get-Help ls`, etc., will still show `ls`, etc., as builtin commands<br>
+* The integration rewrites interactive input, but it does not remove PowerShell's aliases<br>
+  `Get-Command ls`, `Get-Help ls`, etc., will still show `ls`, etc., as PowerShell built-ins or aliases.
   Due to limitations around `PSNativeCommandPreserveBytePipe` we cannot integrate ourselves in a more robust way with PowerShell.
 
 ### Intentionally dropped

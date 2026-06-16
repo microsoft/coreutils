@@ -27,7 +27,7 @@ $MinPwshVersion = [version]'7.4.0'
 $CoreutilsRegPath = 'HKLM:\SOFTWARE\Microsoft\coreutils'
 # A REG_MULTI_SZ list of utility names (e.g. "ls") that the user has disabled.
 $DisabledUtilitiesRegName = 'DisabledUtilities'
-# Contains SID --> Microsoft.PowerShell_profile.ps1 mappins,
+# Contains SID --> Microsoft.PowerShell_profile.ps1 mappings,
 # such that we can clean them up on uninstall.
 $ProfilesRegPath = 'HKLM:\SOFTWARE\Microsoft\coreutils\PowerShellProfiles'
 
