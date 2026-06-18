@@ -18,7 +18,7 @@ use windows_sys::Win32::System::Environment::GetCommandLineW;
 
 use crate::MSG_USAGE;
 use crate::buffer::WideString;
-use crate::io::{exit, stderr_handle, write_stderr_str, write_stdout_str, write_to_handle};
+use crate::io::{StatusResult, stderr_handle, write_stderr_str, write_stdout_str, write_to_handle};
 use crate::path::{directory_exists, full_path, path_state, query_device_len};
 
 unsafe extern "C" {
@@ -51,7 +51,7 @@ impl Default for FindState {
 }
 
 /// ARGUMENT_LEXEMIZER::PrepareToParse + DoParsing + MULTIPLE_PATH_ARGUMENT.
-pub fn parse_command_line() -> (FindState, Vec<WideString>) {
+pub fn parse_command_line() -> StatusResult<(FindState, Vec<WideString>)> {
     // QUIRK / BUG: ulib has two `ARGUMENT_LEXEMIZER::PutSeparators` overloads.
     // The PCWSTRING one folds `_WhiteSpace` and `_SwitchChars` into `_SeparatorString`,
     // while the PCSTR one has those two lines commented out. find.cxx passes a narrow string.
@@ -59,7 +59,7 @@ pub fn parse_command_line() -> (FindState, Vec<WideString>) {
 
     // Technically this could be trivially folded into the loop below.
     // I left it like it works in the original for now.
-    let lexemes = prepare_to_parse();
+    let lexemes = prepare_to_parse()?;
 
     // ARGUMENT_LEXEMIZER::DoParsing, heavily modified & inlined.
 
@@ -124,10 +124,10 @@ pub fn parse_command_line() -> (FindState, Vec<WideString>) {
     if lexemes.next().is_some() {
         if seen.invalid_switch {
             write_stderr_str("FIND: Invalid switch\r\n");
-            exit(2);
+            return Err(2);
         } else {
             write_stderr_str("FIND: Parameter format not correct\r\n");
-            exit(2);
+            return Err(2);
         }
     }
 
@@ -137,17 +137,17 @@ pub fn parse_command_line() -> (FindState, Vec<WideString>) {
         w.push_wide(&failed_pattern);
         w.push_str("\r\n");
         write_to_handle(stderr_handle(), &w);
-        exit(2);
+        return Err(2);
     }
 
     if seen.help {
         write_stdout_str(MSG_USAGE);
-        exit(0);
+        return Err(0);
     }
 
     if !seen.string_pattern {
         write_stderr_str("FIND: Parameter format not correct\r\n");
-        exit(2);
+        return Err(2);
     }
 
     state.case_sensitive = !seen.case_insensitive;
@@ -156,7 +156,7 @@ pub fn parse_command_line() -> (FindState, Vec<WideString>) {
     state.output_line_numbers = seen.display_numbers;
     state.skip_offline_files = !seen.offline && !seen.off;
 
-    (state, paths)
+    Ok((state, paths))
 }
 
 fn raw_command_line() -> &'static [u16] {
@@ -194,7 +194,7 @@ impl Lexeme {
 }
 
 /// Contains logic from `ARGUMENT_LEXEMIZER::PrepareToParse`.
-fn prepare_to_parse() -> Vec<Lexeme> {
+fn prepare_to_parse() -> StatusResult<Vec<Lexeme>> {
     let cmd_line = raw_command_line();
     let mut lexemes = Vec::new();
     let mut pos = 0;
@@ -231,7 +231,7 @@ fn prepare_to_parse() -> Vec<Lexeme> {
                         }
                         None => {
                             write_stderr_str("FIND: Parameter format not correct\r\n");
-                            exit(2);
+                            return Err(2);
                         }
                     }
                 }
@@ -244,7 +244,7 @@ fn prepare_to_parse() -> Vec<Lexeme> {
         lexemes.push(collapse_quoted_lexeme(&cmd_line[tok_start..pos]));
     }
 
-    lexemes
+    Ok(lexemes)
 }
 
 fn collapse_quoted_lexeme(raw: &'static [u16]) -> Lexeme {

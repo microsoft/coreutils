@@ -6,7 +6,7 @@
 
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('Install', 'Uninstall')]
+    [ValidateSet('Install', 'Uninstall', 'Refresh')]
     [string]$Action,
     [ValidateSet('AllUsers', 'CurrentUser')]
     [string]$Scope = 'AllUsers',
@@ -24,7 +24,10 @@ $SectionMarker = '60b36fc6-2d59-49df-be51-28dd2f4c3c9a'
 $MarkerLine = "# DO NOT MODIFY -- coreutils -- $SectionMarker"
 # Earliest PowerShell that supports PSNativeCommandPreserveBytePipe.
 $MinPwshVersion = [version]'7.4.0'
-# Contains SID --> Microsoft.PowerShell_profile.ps1 mappins,
+$CoreutilsRegPath = 'HKLM:\SOFTWARE\Microsoft\coreutils'
+# A REG_MULTI_SZ list of utility names (e.g. "ls") that the user has disabled.
+$DisabledUtilitiesRegName = 'DisabledUtilities'
+# Contains SID --> Microsoft.PowerShell_profile.ps1 mappings,
 # such that we can clean them up on uninstall.
 $ProfilesRegPath = 'HKLM:\SOFTWARE\Microsoft\coreutils\PowerShellProfiles'
 
@@ -37,37 +40,46 @@ function Remove-FileIfExists([string]$Path) {
     }
 }
 
-function Get-ProfileWritePath([string]$Path) {
-    $item = Get-Item -LiteralPath $Path -Force -ErrorAction Ignore
-    if (!$item -or $item.LinkType -ne 'SymbolicLink') {
-        return $Path
+function Get-EnabledCoreutilsAliases([string]$CmdDir) {
+    [string[]]$disabled = @()
+    if ($props = Get-ItemProperty -LiteralPath $CoreutilsRegPath -Name $DisabledUtilitiesRegName -ErrorAction Ignore) {
+        $disabled = $props.$DisabledUtilitiesRegName
+    }
+    $disabled = [System.Collections.Generic.HashSet[string]]::new($disabled, [System.StringComparer]::OrdinalIgnoreCase)
+
+    $aliases = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+    foreach ($file in Get-ChildItem -LiteralPath $CmdDir -Filter '*.cmd' -File -ErrorAction Ignore) {
+        $alias = [System.IO.Path]::GetFileNameWithoutExtension($file.Name)
+        if ($alias -and !$disabled.Contains($alias)) {
+            [void]$aliases.Add($alias)
+        }
     }
 
-    $target = $item.Target
-    if (!$target) {
-        return $Path
+    # coreutils-manager is a hidden utility. Theoretically it should not be in the cmd
+    # directory at all (it's only exposed as coreutils-manager.exe), but just in case...
+    [void]$aliases.Remove('coreutils-manager')
+
+    if ($aliases.Contains('ls')) {
+        [void]$aliases.Add('la')
     }
-    if ($target -is [array]) {
-        $target = $target[0]
-    }
-    if (![System.IO.Path]::IsPathRooted($target)) {
-        $target = [System.IO.Path]::GetFullPath((Join-Path (Split-Path -LiteralPath $Path) $target))
-    }
-    return $target
+
+    return @($aliases | Sort-Object)
 }
 
 function Get-InjectedSection([string]$CmdDir) {
     $templatePath = Join-Path $PSScriptRoot 'pwsh-install-template.ps1'
     $template = Get-Content -LiteralPath $templatePath -Raw
     $cmdDir = [System.IO.Path]::GetFullPath($CmdDir).TrimEnd('\') + '\'
-    $template = $template.Replace('!!CMDDIR!!', $cmdDir)
+    $aliases = (Get-EnabledCoreutilsAliases $cmdDir | ForEach-Object { "'$_'" }) -join ','
+    $template = $template.Replace("'!!COREUTILS!!'", $aliases)
+    $template = $template.Replace("!!CMDDIR!!", $cmdDir.Replace("'", "''"))
     $body = $template.TrimEnd("`r", "`n")
     return "$MarkerLine`r`n$body`r`n$MarkerLine"
 }
 
-function Update-PowerShellProfile([string]$Path, [bool] $Install, [bool] $UseBom, [string]$Section) {
+function Update-PowerShellProfile([string]$Path, [bool] $Install, [bool] $UseBom, [string]$Section, [bool]$RefreshOnly) {
     $parent = Split-Path -LiteralPath $Path
-    if ($Install) {
+    if ($Install -and !$RefreshOnly) {
         [void](New-Item -Path $parent -ItemType Directory -Force)
     }
     elseif (!(Test-Path -LiteralPath $Path)) {
@@ -91,6 +103,9 @@ function Update-PowerShellProfile([string]$Path, [bool] $Install, [bool] $UseBom
     $markerCount = ([regex]::Matches($text, $marker)).Count
     if ($markerCount -ne 0 -and $markerCount -ne 2) {
         throw "Invalid coreutils section markers in PowerShell profile: $Path"
+    }
+    if ($RefreshOnly -and $markerCount -eq 0) {
+        return
     }
 
     # Strip the existing section (markers + content + any surrounding blank lines) in one shot.
@@ -132,10 +147,10 @@ function Update-PowerShellProfile([string]$Path, [bool] $Install, [bool] $UseBom
     }
 }
 
-function Get-MsiPwshInstalls {
+function Get-MsiPwshProfilePaths {
     Get-ChildItem -LiteralPath 'HKLM:\SOFTWARE\Microsoft\PowerShellCore\InstalledVersions' -ErrorAction Ignore | ForEach-Object {
         $props = Get-ItemProperty -LiteralPath $_.PSPath -ErrorAction Ignore
-        if (!($props -and $props.InstallDir -and $props.SemanticVersion)) {
+        if (!$props -or !$props.PSObject.Properties['InstallLocation'] -or !$props.PSObject.Properties['SemanticVersion']) {
             return
         }
 
@@ -150,10 +165,7 @@ function Get-MsiPwshInstalls {
             return
         }
 
-        [PSCustomObject]@{
-            InstallDir  = $props.InstallDir
-            ProfilePath = Join-Path $props.InstallDir 'Microsoft.PowerShell_profile.ps1'
-        }
+        Join-Path $props.InstallLocation 'Microsoft.PowerShell_profile.ps1'
     }
 }
 
@@ -208,7 +220,7 @@ function Get-RecordedProfiles {
 
 function Save-RecordedProfile([string]$Sid, [string]$Value) {
     [void](New-Item -Path $ProfilesRegPath -Force)
-    Set-ItemProperty -LiteralPath $ProfilesRegPath -Name $Sid -Value $Value -Type String
+    [void](New-ItemProperty -LiteralPath $ProfilesRegPath -Name $Sid -Value $Value -PropertyType String -Force)
 }
 
 function Remove-RecordedProfile([string]$Sid) {
@@ -240,8 +252,8 @@ function Get-ProfilePlan([bool] $Install, [string]$Scope) {
         return $obj
     }
 
-    foreach ($i in Get-MsiPwshInstalls) {
-        $entry = Add $i.ProfilePath
+    foreach ($profilePath in Get-MsiPwshProfilePaths) {
+        $entry = Add $profilePath
         if ($allUsersInstall) {
             $entry.Install = $true
         }
@@ -273,9 +285,45 @@ function Get-ProfilePlan([bool] $Install, [string]$Scope) {
     return $plan.Values
 }
 
+function Get-RefreshProfilePlan {
+    $plan = @{}
+
+    function Add([string]$Path) {
+        if (!$Path) {
+            return
+        }
+        if ($plan[$Path]) {
+            return
+        }
+
+        $plan[$Path] = [PSCustomObject]@{
+            Path        = $Path
+            Install     = $true
+            RecordSid   = $null
+            RecordValue = $null
+        }
+    }
+
+    foreach ($profilePath in Get-MsiPwshProfilePaths) {
+        Add $profilePath
+    }
+    foreach ($r in Get-RecordedProfiles) {
+        Add $r.Path
+    }
+    Add $PROFILE.CurrentUserCurrentHost
+
+    return $plan.Values
+}
+
 $install = $Action -eq 'Install'
-$plan = @(Get-ProfilePlan $install $Scope)
-$section = if ($install) {
+$refresh = $Action -eq 'Refresh'
+$plan = if ($refresh) {
+    @(Get-RefreshProfilePlan)
+}
+else {
+    @(Get-ProfilePlan $install $Scope)
+}
+$section = if ($install -or $refresh) {
     Get-InjectedSection $CmdDir
 }
 else {
@@ -283,20 +331,22 @@ else {
 }
 
 foreach ($entry in $plan) {
-    Update-PowerShellProfile $entry.Path $entry.Install $false $section
+    Update-PowerShellProfile -Path $entry.Path -Install $entry.Install -UseBom $false -Section $section -RefreshOnly $refresh
 }
 
 # Only adjust records once every Update succeeded. A failure mid-loop leaves
 # the old records intact so a re-run re-discovers the same paths and retries
 # the cleanup/install.
-foreach ($entry in $plan) {
-    if (!$entry.RecordSid) {
-        continue
-    }
-    if ($entry.Install) {
-        Save-RecordedProfile $entry.RecordSid $entry.RecordValue
-    }
-    else {
-        Remove-RecordedProfile $entry.RecordSid
+if (!$refresh) {
+    foreach ($entry in $plan) {
+        if (!$entry.RecordSid) {
+            continue
+        }
+        if ($entry.Install) {
+            Save-RecordedProfile $entry.RecordSid $entry.RecordValue
+        }
+        else {
+            Remove-RecordedProfile $entry.RecordSid
+        }
     }
 }

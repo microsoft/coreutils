@@ -25,7 +25,10 @@ use windows_sys::Win32::System::Console::{GetStdHandle, STD_INPUT_HANDLE};
 
 use crate::argv::parse_command_line;
 use crate::buffer::{BufferStream, WideString};
-use crate::io::{exit, io_init, stderr_handle, stdout_handle, write_stderr_str, write_to_handle};
+use crate::io::{
+    IntoStatus as _, StatusResult, io_init, stderr_handle, stdout_handle, write_stderr_str,
+    write_to_handle,
+};
 use crate::path::is_drive_path;
 
 const MSG_USAGE: &str = concat!(
@@ -46,14 +49,18 @@ const MSG_USAGE: &str = concat!(
     "or piped from another command.\r\n"
 );
 
-pub fn ntfind_main() -> ! {
+pub fn ntfind_main() -> i32 {
+    main().into_status()
+}
+
+fn main() -> StatusResult<()> {
     io_init();
 
-    let (mut state, mut files) = parse_command_line();
+    let (mut state, mut files) = parse_command_line()?;
 
     if files.is_empty() {
         let h_stdin = unsafe { GetStdHandle(STD_INPUT_HANDLE) };
-        let lines_found = search_stream(&mut state, h_stdin);
+        let lines_found = search_stream(&mut state, h_stdin)?;
 
         if !state.output_lines {
             let mut out = WideString::new();
@@ -132,7 +139,7 @@ pub fn ntfind_main() -> ! {
                 write_to_handle(stdout_handle(), &out);
             }
 
-            let lines_found = search_stream(&mut state, h_file);
+            let lines_found = search_stream(&mut state, h_file)?;
 
             if !state.output_lines {
                 out.clear();
@@ -153,10 +160,10 @@ pub fn ntfind_main() -> ! {
         }
     }
 
-    exit(if state.found_any { 0 } else { 1 });
+    if state.found_any { Ok(()) } else { Err(1) }
 }
 
-fn search_stream(state: &mut argv::FindState, handle: HANDLE) -> u32 {
+fn search_stream(state: &mut argv::FindState, handle: HANDLE) -> StatusResult<u32> {
     let mut line_count: u32 = 0;
     let mut found_count: u32 = 0;
     let pattern_len = state.pattern.len();
@@ -168,7 +175,7 @@ fn search_stream(state: &mut argv::FindState, handle: HANDLE) -> u32 {
         NORM_IGNORECASE
     };
 
-    while let Some(line) = reader.read_line() {
+    while let Some(line) = reader.read_line()? {
         line_count += 1;
 
         // Look for pattern in the current line. A 0-length pattern ("") never matches.
@@ -217,7 +224,7 @@ fn search_stream(state: &mut argv::FindState, handle: HANDLE) -> u32 {
         state.found_any = true;
     }
 
-    found_count
+    Ok(found_count)
 }
 
 /// Matches `IsDos5CompatibleFileName` in file.cxx.
