@@ -13,6 +13,7 @@ unsafe extern "C" {
     pub fn wcslen(buf: *const u16) -> usize;
 }
 
+#[derive(Debug, PartialEq, Eq)]
 enum Flavor {
     Ambiguous,
     Dos,
@@ -59,13 +60,17 @@ fn find_heuristic() -> Flavor {
         slice::from_raw_parts(p, len)
     };
 
+    find_heuristic_from_cmd_line(cmd_line)
+}
+
+fn find_heuristic_from_cmd_line(cmd_line: &[u16]) -> Flavor {
     // Strip the program name
     let rest: &[u16] = next_raw_find_token(cmd_line).map_or(&[], |(_, rest)| rest);
 
     let Some((first, mut rest)) = next_raw_find_token(rest) else {
         return Flavor::Ambiguous;
     };
-    if is_dos_find_switch(first.raw) || first.raw.first().is_some_and(|&c| c == b'/' as u16) {
+    if is_dos_find_switch(first.raw) {
         return Flavor::Dos;
     }
     if !first.starts_quoted {
@@ -303,4 +308,54 @@ fn token_eq_insensitive(token: &[u16], pattern: &[u8]) -> bool {
             };
             c == p as u16
         })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Flavor, find_heuristic_from_cmd_line};
+
+    fn wide(s: &str) -> Vec<u16> {
+        s.encode_utf16().collect()
+    }
+
+    #[test]
+    fn find_slash_root_uses_gnu_find() {
+        assert_eq!(
+            find_heuristic_from_cmd_line(&wide("find.exe / -name *.txt")),
+            Flavor::Gnu
+        );
+    }
+
+    #[test]
+    fn find_slash_paths_use_gnu_find() {
+        for cmd_line in [
+            "find.exe /etc/hosts -name hosts",
+            "find.exe /c/Users -name *.txt",
+            "find.exe /logs -type f",
+        ] {
+            assert_eq!(find_heuristic_from_cmd_line(&wide(cmd_line)), Flavor::Gnu);
+        }
+    }
+
+    #[test]
+    fn find_dos_switch_still_uses_nt_find() {
+        for cmd_line in [
+            "find.exe /C needle file.txt",
+            "find.exe /I needle file.txt",
+            "find.exe /N needle file.txt",
+            "find.exe /V needle file.txt",
+            "find.exe /OFF needle file.txt",
+            "find.exe /OFFLINE needle file.txt",
+        ] {
+            assert_eq!(find_heuristic_from_cmd_line(&wide(cmd_line)), Flavor::Dos);
+        }
+    }
+
+    #[test]
+    fn quoted_slash_search_string_stays_nt_find() {
+        assert_eq!(
+            find_heuristic_from_cmd_line(&wide("find.exe \"/\" file.txt")),
+            Flavor::Dos
+        );
+    }
 }
