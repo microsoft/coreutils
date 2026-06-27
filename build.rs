@@ -49,6 +49,10 @@ fn generate_uutils_map() {
         if util == "test" {
             entries.push(("[".into(), value.clone()));
         }
+        if util == "newgrp" {
+            // sg is an alias for newgrp that always runs a command via a shell
+            entries.push(("sg".into(), value.clone()));
+        }
         entries.push((util.clone(), value));
     }
 
