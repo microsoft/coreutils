@@ -301,13 +301,10 @@ extern "C" fn restore_console_modes() {
 }
 
 /// Restores the console modes and then exits.
-///
-/// NOTE: Regular uutils/coreutils calls std::process::exit, which flushes stdout buffers.
-/// However, the utils are designed such that they can be used in-proc so
-/// if they didn't flush themselves, they would be considered buggy anyway.
-///
 /// TerminateProcess is used because it is technically superior to ExitProcess.
+/// NOTE: Regular uutils/coreutils calls std::process::exit.
 fn exit(code: i32) -> ! {
+    _ = std::io::stdout().flush();
     unsafe {
         restore_console_modes();
         TerminateProcess(GetCurrentProcess(), code as u32);
