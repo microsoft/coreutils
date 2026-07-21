@@ -146,7 +146,7 @@ fn next_raw_find_token(mut input: &[u16]) -> Option<(RawFindToken<'_>, &[u16])> 
     ))
 }
 
-const DOS_FIND_TOKENS: &[&[u8]] = &[b"/C", b"/I", b"/N", b"/OFF", b"/OFFLINE", b"/V"];
+const DOS_FIND_TOKENS: &[&[u8]] = &[b"/?", b"/C", b"/I", b"/N", b"/OFF", b"/OFFLINE", b"/V"];
 
 fn is_dos_find_switch(token: &[u16]) -> bool {
     DOS_FIND_TOKENS
