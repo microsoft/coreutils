@@ -238,52 +238,32 @@ begin
     g_HasUsablePowerShell := g_HasUsablePowerShell and (g_PowerShellExecutionPolicy <> '');
 end;
 
-function RunPwshScript(const ExtraParams: String; IgnoreFailure: Boolean): Boolean;
+procedure RunPwshScript(const ExtraParams: String);
 var
     Output: TExecOutput;
     Params, Detail: String;
     ResultCode: Integer;
 begin
-    Result := False;
     Params := '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File ' + AddQuotes(g_AppDirPath + 'pwsh-install.ps1') + ' ' + ExtraParams;
     if not ExecAndCaptureOutput('pwsh.exe', Params, '', SW_SHOWNORMAL, ewWaitUntilTerminated, ResultCode, Output) then
-    begin
-        if IgnoreFailure then
-        begin
-            Log('Skipping PowerShell profile update because pwsh.exe could not be executed');
-            Exit;
-        end;
-        RaiseException('Failed to execute pwsh.exe');
-    end;
-
-    if ResultCode = 0 then
-    begin
-        Result := True;
         Exit;
-    end;
 
-    Detail := '';
-    if GetArrayLength(Output.StdErr) > 0 then
-        Detail := Output.StdErr[0]
-    else if GetArrayLength(Output.StdOut) > 0 then
-        Detail := Output.StdOut[0];
-
-    if IgnoreFailure then
+    if ResultCode <> 0 then
     begin
+        Detail := '';
+        if GetArrayLength(Output.StdErr) > 0 then
+            Detail := Output.StdErr[0]
+        else if GetArrayLength(Output.StdOut) > 0 then
+            Detail := Output.StdOut[0];
+
         if Detail <> '' then
-            Log('Failed to update PowerShell profiles: ' + Detail)
+            RaiseException('Failed to update PowerShell profiles: ' + Detail)
         else
-            Log('Failed to update PowerShell profiles');
-        Exit;
+            RaiseException('Failed to update PowerShell profiles');
     end;
-
-    if Detail <> '' then
-        RaiseException('Failed to update PowerShell profiles: ' + Detail)
-    else
-        RaiseException('Failed to update PowerShell profiles');
 end;
 
-procedure InstallPowerShellProfiles(Scope: Integer; IgnoreFailure: Boolean);
+procedure InstallPowerShellProfiles(Scope: Integer);
 var
     Params: String;
 begin
@@ -298,7 +278,7 @@ begin
         Params := Params + ' -CmdDir ' + AddQuotes(RemoveBackslashUnlessRoot(g_AppCmdDirPath));
     end;
 
-    RunPwshScript(Params, IgnoreFailure);
+    RunPwshScript(Params);
 end;
 
 // #### Event Handlers ####
@@ -382,10 +362,11 @@ begin
         ModifyPath(WizardIsTaskSelected('addtopath'));
 
         if g_HasUsablePowerShell then
-        begin
-            Scope := g_PowerShellPage.SelectedValueIndex;
-            InstallPowerShellProfiles(Scope, False);
-        end;
+            Scope := g_PowerShellPage.SelectedValueIndex
+        else
+            Scope := PWSH_SCOPE_NONE;
+
+        InstallPowerShellProfiles(Scope);
     end;
 end;
 
@@ -394,11 +375,11 @@ begin
     if CurUninstallStep = usUninstall then
     begin
         InitializeGlobals;
-        DetectPowerShell;
-        if g_HasUsablePowerShell then
-            InstallPowerShellProfiles(PWSH_SCOPE_NONE, True)
-        else
-            Log('Skipping PowerShell profile cleanup because pwsh.exe is unavailable or unsupported');
+        try
+            InstallPowerShellProfiles(PWSH_SCOPE_NONE);
+        except
+            MsgBox('An error occurred: ' + GetExceptionMessage, mbError, MB_OK);
+        end;
         ModifyPath(False);
         DelTree(g_AppDirPath, True, True, True);
     end;
