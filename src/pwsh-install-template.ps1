@@ -1,24 +1,7 @@
 # vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
 # Inlining the template into the profile shaves off ~10ms (25%).
 $script:__COREUTILS__ = [System.Collections.Generic.HashSet[string]]::new(
-    [string[]]@(
-        'arch', 'b2sum', 'base32', 'base64', 'basename',
-        'basenc', 'cat', 'cksum', 'comm', 'cp',
-        'csplit', 'cut', 'date', 'df', 'dirname',
-        'du', 'echo', 'env', 'expr', 'factor',
-        'false', 'find', 'fmt', 'fold', 'grep',
-        'head', 'hostname', 'join', 'la', 'link',
-        'ln', 'ls', 'md5sum', 'mkdir', 'mktemp',
-        'mv', 'nl', 'nproc', 'numfmt', 'od',
-        'pathchk', 'pr', 'printenv', 'printf', 'ptx',
-        'pwd', 'readlink', 'realpath', 'rm', 'rmdir',
-        'seq', 'sha1sum', 'sha224sum', 'sha256sum', 'sha384sum',
-        'sha512sum', 'shuf', 'sleep', 'sort', 'split',
-        'stat', 'sum', 'tac', 'tail', 'tee',
-        'test', 'touch', 'tr', 'true', 'truncate',
-        'tsort', 'unexpand', 'uniq', 'unlink', 'uptime',
-        'wc', 'xargs', 'yes'
-    ),
+    [string[]]@('!!COREUTILS!!'),
     [System.StringComparer]::OrdinalIgnoreCase
 )
 

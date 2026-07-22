@@ -38,13 +38,26 @@ Or grab the latest build from our [Release Page](https://github.com/microsoft/co
 
 <br/>
 
+## Creating custom alias
+
+* PowerShell: Set-Alias ll 'ls' or a function in your $PROFILE for arguments, e.g. `function ll { ls -la --color=auto @args }`
+* CMD: doskey ll=ls -la $*
+
+> [!WARNING]
+> Using PowerShell aliases will cause binary stream compatibility. Some utilities will not work when piped (e.g. xargs, find, ...)
+
 ## Shell conflicts
 
 > [!NOTE]
 > Any command not mentioned is included in this suite. The following only lists conflicts.
 
+> [!NOTE]
+> You can remove additional utilities using `coreutils-manager disable <utility name>`.
+> See `coreutils-manager --help` for other management commands.
+
 > [!WARNING]
-> PowerShell 7.4 or newer is required. Older PowerShell versions aren't supported.
+> PowerShell 7.4 or later is required.
+> PowerShell 7.6 or later is recommended for `~` support.
 
 Several commands share names with built-ins in CMD and PowerShell. Whether the Coreutils
 version runs depends on the shell, the PATH order, and (for PowerShell) the alias table.
@@ -82,7 +95,7 @@ Legend: ✅ ships and works · ⚠️ ships but conflicts with a built-in · �
 
 | Difference            | Detail |
 | --------------------- | ------ |
-| **CRLF line endings** | Windows text files often use CRLF (`\r\n`). Most utilities handle this transparently, but pattern matching with `$` and exact byte counts can be affected. |
+| **CRLF line endings** | Windows text files often use CRLF (`\r\n`). Most utilities handle this transparently, but byte-oriented behavior can still observe the `\r`; for example, `uniq` may treat the final line as different from a preceding duplicate if the input uses CRLF and the final line has no trailing newline. |
 | **No `/dev/null`**    | Use `NUL` instead, for example `find . -name "*.log" > NUL` |
 | **No POSIX signals**  | Signals such as `SIGHUP`, `SIGPIPE`, and `SIGUSR` aren't available. `Ctrl+C` (`SIGINT`) works as expected. |
 | **Path separators**   | Both `/` and `\` are accepted. Some utilities produce `\`-separated output, which can affect downstream piping. |
@@ -92,13 +105,14 @@ Legend: ✅ ships and works · ⚠️ ships but conflicts with a built-in · �
 ### PowerShell Command Parsing
 
 The installer integrates itself with interactive PowerShell sessions via `PSReadLine`.
-It ensures that quoted expression behave somewhat like they do under UNIX shells or CMD:
+It ensures that quoted expressions behave somewhat like they do under UNIX shells or CMD:
 `echo *.txt` will then print a number of file names, while `echo '*.txt'` will print "*.txt" literally.
 
 There are two shortcomings, however:
 * PowerShell's escape character is still <code>\`</code>, not <code>\\</code><br>
   While you may write `find . \( -foo -bar \)` with Bash, you still need to write ``find . `( -foo -bar `)`` in PowerShell.
-* `Get-Command ls`, `Get-Help ls`, etc., will still show `ls`, etc., as builtin commands<br>
+* The integration rewrites interactive input, but it does not remove PowerShell's aliases<br>
+  `Get-Command ls`, `Get-Help ls`, etc., will still show `ls`, etc., as PowerShell built-ins or aliases.
   Due to limitations around `PSNativeCommandPreserveBytePipe` we cannot integrate ourselves in a more robust way with PowerShell.
 
 ### Intentionally dropped
@@ -108,7 +122,7 @@ Commands that exist upstream but aren't shipped here because they rely on POSIX-
 * `dd`: Perhaps useful in the future.
 * `dircolors`, `shred`, `sync`, `uname`: Not particularly useful on Windows.
 * `chcon`, `chgrp`, `chmod`, `chown`, `chroot`, `groups`, `hostid`, `id`, `install`,
-  `logname`, `mkfifo`, `mknod`, `nice`, `nohup`, `pathchk`, `pinky`, `runcon`, `stdbuf`,
+  `logname`, `mkfifo`, `mknod`, `nice`, `nohup`, `pinky`, `runcon`, `stdbuf`,
   `stty`, `tty`, `users`, `who`: POSIX-only concepts unavailable on Windows.
 
 <br/>

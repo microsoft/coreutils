@@ -36,8 +36,8 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Tasks]
 Name: "addtopath"; Description: "Add to system &PATH"
-Name: "corefind"; Description: "find: Prefer GNU find over DOS find for ambiguous commands (may break Batch scripts)"
-Name: "coresort"; Description: "sort: Prefer GNU sort over DOS sort for ambiguous commands (may break non-UTF8 Batch scripts)"
+Name: "corefind"; Description: "find (may break Batch scripts)"; GroupDescription: "Prefer Coreutils- over DOS-style behavior when the invocation is ambiguous for:"
+Name: "coresort"; Description: "sort (may break non-UTF8 Batch scripts)"; GroupDescription: "Prefer Coreutils- over DOS-style behavior when the invocation is ambiguous for:"
 
 [Files]
 Source: "src\pwsh-install.ps1"; DestDir: "{app}"; Flags: notimestamp ignoreversion
@@ -93,25 +93,24 @@ end;
 procedure CreateHardlinks;
 var
     Output: TExecOutput;
-    Name: String;
-    ResultCode, I: Integer;
+    Detail: String;
+    ResultCode: Integer;
 begin
     ForceDirectories(g_AppBinDirPath);
     ForceDirectories(g_AppCmdDirPath);
 
-    if (not ExecAndCaptureOutput(g_CoreutilsExePath, '--list', '', SW_SHOWNORMAL, ewWaitUntilTerminated, ResultCode, Output)) or (ResultCode <> 0) then
-        RaiseException('Failed to execute coreutils.exe --list');
-
-    for I := 0 to GetArrayLength(Output.StdOut) - 1 do
+    if (not ExecAndCaptureOutput(g_CoreutilsExePath, 'coreutils-manager refresh', '', SW_SHOWNORMAL, ewWaitUntilTerminated, ResultCode, Output)) or (ResultCode <> 0) then
     begin
-        Name := Trim(Output.StdOut[I]);
-        if (Name <> '') and (Name <> '[') then
-        begin
-            if not CreateHardLink(g_AppBinDirPath + Name + '.exe', g_CoreutilsExePath, 0) then
-                RaiseException('Failed to create hardlink for ' + Name);
-            if not CreateHardLink(g_AppCmdDirPath + Name + '.cmd', g_CoreutilsExePath, 0) then
-                RaiseException('Failed to create hardlink for ' + Name);
-        end;
+        Detail := '';
+        if GetArrayLength(Output.StdErr) > 0 then
+            Detail := Output.StdErr[0]
+        else if GetArrayLength(Output.StdOut) > 0 then
+            Detail := Output.StdOut[0];
+
+        if Detail <> '' then
+            RaiseException('Failed to refresh coreutils links: ' + Detail)
+        else
+            RaiseException('Failed to refresh coreutils links');
     end;
 end;
 
@@ -313,7 +312,7 @@ begin
     Description :=
         'Coreutils needs a small profile snippet to work inside PowerShell. ' +
         'Without it, PowerShell mangles argument quoting and globbing, so most Coreutils commands wouldn''t behave correctly. ' +
-        'The snippet also overrides PowerShell''s built-in aliases (cat, cp, ls, ...) so they resolve to the Coreutils versions.' + #13#10#13#10 +
+        'The snippet does not remove PowerShell''s built-in aliases. It rewrites interactive input so names such as cat, cp, and ls resolve to the Coreutils versions.' + #13#10#13#10 +
         'PowerShell 7.4 or newer is required (it requires PSNativeCommandPreserveBytePipe).';
 
     if not g_HasSupportedPowerShellExecutionPolicy then
@@ -367,7 +366,7 @@ begin
             'Only the profile of the user running this installer will be modified. ' +
             'Other accounts on this machine will each need to re-run the installer (or pick the all-users option) to get it.' + #13#10#13#10 +
             'Continue with the current-user installation?';
-        if MsgBox(Msg, mbConfirmation, MB_YESNO) <> IDYES then
+        if SuppressibleMsgBox(Msg, mbConfirmation, MB_YESNO, IDYES) <> IDYES then
             Result := False;
     end;
 end;

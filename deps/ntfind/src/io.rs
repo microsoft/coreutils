@@ -1,7 +1,6 @@
 // Copyright (c) Microsoft Corporation.
 // Licensed under the MIT License.
 
-use core::hint::unreachable_unchecked;
 use core::ptr;
 
 use alloc::vec::Vec;
@@ -12,9 +11,23 @@ use windows_sys::Win32::System::Console::{
     GetConsoleCP, GetConsoleMode, GetStdHandle, STD_ERROR_HANDLE, STD_HANDLE, STD_OUTPUT_HANDLE,
     WriteConsoleW,
 };
-use windows_sys::Win32::System::Threading::{GetCurrentProcess, TerminateProcess};
 
 use crate::buffer::WideString;
+
+pub type StatusResult<T> = core::result::Result<T, i32>;
+
+pub trait IntoStatus {
+    fn into_status(self) -> i32;
+}
+
+impl<T> IntoStatus for core::result::Result<T, i32> {
+    fn into_status(self) -> i32 {
+        match self {
+            Ok(_) => 0,
+            Err(code) => code,
+        }
+    }
+}
 
 pub struct OutputHandle {
     handle: HANDLE,
@@ -156,14 +169,4 @@ pub fn write_stdout_str(s: &str) {
 
 pub fn write_stderr_str(s: &str) {
     write_str(stderr_handle(), s);
-}
-
-/// Our own std::process::exit. It had not other place to live at.
-pub fn exit(code: u32) -> ! {
-    unsafe {
-        // TerminateProcess is technically preferable nowadays, because it genuinely exits faster.
-        // Since we're an executable we have nothing to loose by using it.
-        TerminateProcess(GetCurrentProcess(), code);
-        unreachable_unchecked();
-    }
 }
