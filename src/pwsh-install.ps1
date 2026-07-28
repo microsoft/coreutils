@@ -87,7 +87,7 @@ function Update-PowerShellProfile([string]$Path, [bool] $Install, [bool] $UseBom
     }
 
     $profile = Get-Item -LiteralPath $Path -Force -ErrorAction Ignore
-    if ($profile -and $profile.ResolvedTarget) {
+    if ($profile) {
         $Path = $profile.ResolvedTarget
     }
 
