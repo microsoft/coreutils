@@ -5,6 +5,7 @@
 // Microsoft-authored changes, which Microsoft makes available to uutils
 // under the uutils MIT License for upstream incorporation. See NOTICE.md.
 
+mod manager;
 mod nthelpers;
 
 use std::borrow::Cow;
@@ -12,18 +13,30 @@ use std::cmp;
 use std::ffi::{OsStr, OsString};
 use std::io::{self, Write as _, stderr};
 use std::path::{Path, PathBuf};
-use std::process;
+use std::sync::atomic::AtomicU32;
 
 use clap::Command;
 use itertools::Itertools as _;
+use uucore::Args;
 use uucore::display::Quotable as _;
-use uucore::{Args, error::strip_errno, locale};
+use uucore::windows_sys::Win32::System::Threading::GetCurrentProcess;
+use uucore::{error::strip_errno, locale};
 use windows_sys::Win32::Globalization::CP_UTF8;
-use windows_sys::Win32::System::Console::{GetConsoleOutputCP, SetConsoleOutputCP};
+use windows_sys::Win32::System::Console;
+use windows_sys::Win32::System::Threading::TerminateProcess;
 
-const VERSION: &str = env!("CARGO_PKG_VERSION");
+unsafe extern "C" {
+    fn atexit(cb: extern "C" fn()) -> i32;
+    unsafe fn ntsort_main(argc: i32, argv: *const *const u8) -> i32;
+}
 
 include!(concat!(env!("OUT_DIR"), "/uutils_map.rs"));
+
+// While uucore::Args is a trait, this is the actual type it'll resolve to in the end.
+type ArgsType = std::iter::Chain<std::vec::IntoIter<std::ffi::OsString>, wild::ArgsOs>;
+
+const VERSION: &str = env!("CARGO_PKG_VERSION");
+const UTIL_MAP: UtilityMap<ArgsType> = util_map();
 
 fn usage<T>(utils: &UtilityMap<T>, name: &str) {
     let display_list = utils.keys().copied().join(", ");
@@ -31,7 +44,7 @@ fn usage<T>(utils: &UtilityMap<T>, name: &str) {
     let indent_list = textwrap::indent(&textwrap::fill(&display_list, width), "    ");
     let common_core_string = "
 Functions:
-      '<uutils>' [arguments...]
+      '<coreutils>' [arguments...]
 
 ";
     let s = format!(
@@ -51,7 +64,7 @@ Currently defined functions:
         && e.kind() != io::ErrorKind::BrokenPipe
     {
         let _ = writeln!(io::stderr(), "coreutils: {}", strip_errno(&e));
-        process::exit(1);
+        exit(1);
     }
 }
 
@@ -61,20 +74,21 @@ fn main() {
     // The good news is that this just so happens to not negatively affect ntfind,
     // because through ulib it incorrectly checks the input CP instead of the output one.
     // ntsort just hardcodes to CP_OEMCP, so it also isn't affected.
-    let _restore_cp = set_console_cp_utf8();
+    set_console_modes();
 
-    let utils = util_map();
-    let mut args = uucore::args_os();
+    // `wild::args_os()` is what `uucore::args_os()` uses under the hood.
+    // By using it directly we avoid duplicating all arg strings.
+    let mut args = wild::args_os();
 
     let binary = binary_path(&mut args);
     let binary_as_util = name(&binary).unwrap_or_else(|| {
-        usage(&utils, "<unknown binary name>");
-        process::exit(0);
+        usage(&UTIL_MAP, "<unknown binary name>");
+        exit(0);
     });
 
     // binary name ends with util name?
     let is_coreutils = binary_as_util.ends_with("utils");
-    let matched_util = utils
+    let matched_util = UTIL_MAP
         .keys()
         .filter(|&&u| binary_as_util.ends_with(u) && !is_coreutils)
         .max_by_key(|u| u.len()); //Prefer stty more than tty. *utils is not ls
@@ -100,33 +114,33 @@ fn main() {
                 // we should fail with additional args https://github.com/uutils/coreutils/issues/11383#issuecomment-4082564058
                 if args.next().is_some() {
                     let _ = writeln!(io::stderr(), "coreutils: invalid argument");
-                    process::exit(1);
+                    exit(1);
                 }
                 let mut out = io::stdout().lock();
-                for util in utils.keys() {
+                for util in UTIL_MAP.keys() {
                     if let Err(e) = writeln!(out, "{util}")
                         && e.kind() != io::ErrorKind::BrokenPipe
                     {
                         let _ = writeln!(io::stderr(), "coreutils: {}", strip_errno(&e));
-                        process::exit(1);
+                        exit(1);
                     }
                 }
-                process::exit(0);
+                exit(0);
             }
             "--version" | "-V" => {
                 if let Err(e) = writeln!(io::stdout(), "coreutils {VERSION} (multi-call binary)")
                     && e.kind() != io::ErrorKind::BrokenPipe
                 {
                     let _ = writeln!(io::stderr(), "coreutils: {}", strip_errno(&e));
-                    process::exit(1);
+                    exit(1);
                 }
-                process::exit(0);
+                exit(0);
             }
             // Not a special command: fallthrough to calling a util
             _ => {}
         }
 
-        match utils.get(util) {
+        match UTIL_MAP.get(util) {
             Some(&(uumain, _)) => {
                 // TODO: plug the deactivation of the translation
                 // and load the English strings directly at compilation time in the
@@ -134,7 +148,7 @@ fn main() {
                 // Could be something like:
                 // #[cfg(not(feature = "only_english"))]
                 setup_localization_or_exit(util);
-                process::exit(uumain(vec![util_os].into_iter().chain(args)));
+                exit(uumain(vec![util_os].into_iter().chain(args)));
             }
             None => {
                 if util == "--help" || util == "-h" {
@@ -144,7 +158,7 @@ fn main() {
                             not_found(&util_os)
                         };
 
-                        match utils.get(util) {
+                        match UTIL_MAP.get(util) {
                             Some(&(uumain, _)) => {
                                 setup_localization_or_exit(util);
                                 let code = uumain(
@@ -153,13 +167,13 @@ fn main() {
                                         .chain(args),
                                 );
                                 io::stdout().flush().expect("could not flush stdout");
-                                process::exit(code);
+                                exit(code);
                             }
                             None => not_found(&util_os),
                         }
                     }
-                    usage(&utils, binary_as_util);
-                    process::exit(0);
+                    usage(&UTIL_MAP, binary_as_util);
+                    exit(0);
                 } else if util.starts_with('-') {
                     // Argument looks like an option but wasn't recognized
                     unrecognized_option(binary_as_util, &util_os);
@@ -172,11 +186,11 @@ fn main() {
         // GNU just fails, but busybox tests needs usage
         // todo: patch the test suite instead
         if binary_as_util.ends_with("box") {
-            usage(&utils, binary_as_util);
+            usage(&UTIL_MAP, binary_as_util);
         } else {
             let _ = writeln!(io::stderr(), "coreutils: missing argument");
         }
-        process::exit(1);
+        exit(1);
     }
 }
 
@@ -198,7 +212,7 @@ fn not_found(util: &OsStr) -> ! {
         "coreutils: unknown program '{}'",
         util.maybe_quote()
     );
-    process::exit(1);
+    exit(1);
 }
 
 fn unrecognized_option(binary_name: &str, option: &OsStr) -> ! {
@@ -207,7 +221,7 @@ fn unrecognized_option(binary_name: &str, option: &OsStr) -> ! {
         "{binary_name}: unrecognized option '{}'",
         option.to_string_lossy()
     );
-    process::exit(1);
+    exit(1);
 }
 
 fn setup_localization_or_exit(util_name: &str) {
@@ -220,7 +234,7 @@ fn setup_localization_or_exit(util_name: &str) {
             } => eprintln!("Localization parse error at {snippet}: {err_msg}"),
             other => eprintln!("Could not init the localization system: {other}"),
         }
-        process::exit(99)
+        exit(99)
     });
 }
 
@@ -236,31 +250,66 @@ fn get_canonical_util_name(util_name: &str) -> &str {
     }
 }
 
-fn set_console_cp_utf8() -> RestoreConsoleCp {
-    let mut cp = unsafe { GetConsoleOutputCP() };
-    if cp == CP_UTF8 {
-        cp = 0;
-    }
+const EXPECTED_OUTPUT_MODE: u32 = Console::ENABLE_PROCESSED_OUTPUT
+    | Console::ENABLE_WRAP_AT_EOL_OUTPUT
+    | Console::ENABLE_VIRTUAL_TERMINAL_PROCESSING;
 
-    if cp != 0 {
-        unsafe { SetConsoleOutputCP(CP_UTF8) };
-    }
+static ORIGINAL_OUTPUT_CP: AtomicU32 = AtomicU32::new(CP_UTF8);
+static ORIGINAL_OUTPUT_MODE: AtomicU32 = AtomicU32::new(EXPECTED_OUTPUT_MODE);
 
-    RestoreConsoleCp(cp)
+/// Sets the console code page and output modes.
+fn set_console_modes() {
+    unsafe {
+        let mut cp = Console::GetConsoleOutputCP();
+        if cp == 0 {
+            cp = CP_UTF8;
+        }
+        if cp != CP_UTF8 {
+            Console::SetConsoleOutputCP(CP_UTF8);
+        }
+
+        let stdout = Console::GetStdHandle(Console::STD_OUTPUT_HANDLE);
+        let mut mode = 0;
+        if Console::GetConsoleMode(stdout, &raw mut mode) == 0 {
+            mode = EXPECTED_OUTPUT_MODE;
+        }
+        if mode != EXPECTED_OUTPUT_MODE {
+            Console::SetConsoleMode(stdout, EXPECTED_OUTPUT_MODE);
+        }
+
+        ORIGINAL_OUTPUT_CP.store(cp, std::sync::atomic::Ordering::Relaxed);
+        ORIGINAL_OUTPUT_MODE.store(mode, std::sync::atomic::Ordering::Relaxed);
+
+        atexit(restore_console_modes);
+    }
 }
 
-struct RestoreConsoleCp(u32);
+extern "C" fn restore_console_modes() {
+    unsafe {
+        let cp = ORIGINAL_OUTPUT_CP.load(std::sync::atomic::Ordering::Relaxed);
+        let mode = ORIGINAL_OUTPUT_MODE.load(std::sync::atomic::Ordering::Relaxed);
 
-impl Drop for RestoreConsoleCp {
-    fn drop(&mut self) {
-        if self.0 != 0 {
-            unsafe { SetConsoleOutputCP(self.0) };
+        if cp != CP_UTF8 {
+            Console::SetConsoleOutputCP(cp);
+        }
+
+        if mode != EXPECTED_OUTPUT_MODE {
+            let stdout = Console::GetStdHandle(Console::STD_OUTPUT_HANDLE);
+            Console::SetConsoleMode(stdout, mode);
         }
     }
 }
 
-unsafe extern "C" {
-    unsafe fn ntsort_main(argc: i32, argv: *const *const u8) -> i32;
+/// Restores the console modes and then exits.
+/// TerminateProcess is used because it is technically superior to ExitProcess.
+/// NOTE: Regular uutils/coreutils calls std::process::exit.
+fn exit(code: i32) -> ! {
+    _ = std::io::stdout().flush();
+    unsafe {
+        restore_console_modes();
+        TerminateProcess(GetCurrentProcess(), code as u32);
+        std::hint::unreachable_unchecked();
+    }
 }
 
 fn find_uumain<T: Args>(args: T) -> i32 {
@@ -311,7 +360,12 @@ fn sort_uumain<T: Args>(args: T) -> i32 {
             arg.push("\0");
         }
         let ptrs: Vec<_> = args.iter().map(|v| v.as_encoded_bytes().as_ptr()).collect();
-        unsafe { ntsort_main(ptrs.len() as i32, ptrs.as_ptr()) }
+
+        unsafe {
+            // NOTE: ntsort calls exit() on /? and on error.
+            atexit(restore_console_modes);
+            ntsort_main(ptrs.len() as i32, ptrs.as_ptr())
+        }
     } else {
         sort::uumain(args.into_iter())
     }

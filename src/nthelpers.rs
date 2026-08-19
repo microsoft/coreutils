@@ -13,6 +13,7 @@ unsafe extern "C" {
     pub fn wcslen(buf: *const u16) -> usize;
 }
 
+#[derive(Debug, PartialEq, Eq)]
 enum Flavor {
     Ambiguous,
     Dos,
@@ -59,13 +60,17 @@ fn find_heuristic() -> Flavor {
         slice::from_raw_parts(p, len)
     };
 
+    find_heuristic_impl(cmd_line)
+}
+
+fn find_heuristic_impl(cmd_line: &[u16]) -> Flavor {
     // Strip the program name
     let rest: &[u16] = next_raw_find_token(cmd_line).map_or(&[], |(_, rest)| rest);
 
     let Some((first, mut rest)) = next_raw_find_token(rest) else {
         return Flavor::Ambiguous;
     };
-    if is_dos_find_switch(first.raw) || first.raw.first().is_some_and(|&c| c == b'/' as u16) {
+    if is_dos_find_switch(first.raw) {
         return Flavor::Dos;
     }
     if !first.starts_quoted {
@@ -141,7 +146,7 @@ fn next_raw_find_token(mut input: &[u16]) -> Option<(RawFindToken<'_>, &[u16])> 
     ))
 }
 
-const DOS_FIND_TOKENS: &[&[u8]] = &[b"/C", b"/I", b"/N", b"/OFF", b"/OFFLINE", b"/V"];
+const DOS_FIND_TOKENS: &[&[u8]] = &[b"/?", b"/C", b"/I", b"/N", b"/OFF", b"/OFFLINE", b"/V"];
 
 fn is_dos_find_switch(token: &[u16]) -> bool {
     DOS_FIND_TOKENS
@@ -303,4 +308,30 @@ fn token_eq_insensitive(token: &[u16], pattern: &[u8]) -> bool {
             };
             c == p as u16
         })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Flavor, find_heuristic_impl};
+
+    fn wide(s: &str) -> Vec<u16> {
+        s.encode_utf16().collect()
+    }
+
+    #[test]
+    fn find_heuristic() {
+        for (cmd, flavor) in [
+            (r#"find.exe / -name *.txt"#, Flavor::Gnu),
+            (r#"find.exe /logs -type f"#, Flavor::Gnu),
+            (r#"find.exe "/" file.txt"#, Flavor::Dos),
+            (r#"find.exe /C needle file.txt"#, Flavor::Dos),
+            (r#"find.exe /I needle file.txt"#, Flavor::Dos),
+            (r#"find.exe /N needle file.txt"#, Flavor::Dos),
+            (r#"find.exe /V needle file.txt"#, Flavor::Dos),
+            (r#"find.exe /OFF needle file.txt"#, Flavor::Dos),
+            (r#"find.exe /OFFLINE needle file.txt"#, Flavor::Dos),
+        ] {
+            assert_eq!(find_heuristic_impl(&wide(cmd)), flavor);
+        }
+    }
 }

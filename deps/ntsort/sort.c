@@ -1141,7 +1141,7 @@ void init_two_pass()
     if (Temp_dir != NULL)
         _tcscpy_s(temp_path,TEMP_LENGTH,Temp_dir); //modified satyay
     else
-        if ( !GetTempPath2(TEMP_LENGTH - 1, temp_path) ) {
+        if ( !GetTempPath(TEMP_LENGTH - 1, temp_path) ) {
             sys_error(_TEXT("TEMP path"), 0);
         }
     GetTempFileName(temp_path, _TEXT("srt"), 0, Temp_name);

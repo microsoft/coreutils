@@ -1,0 +1,82 @@
+trigger: none
+
+parameters:
+  - name: debug
+    displayName: Enable debug output
+    type: boolean
+    default: false
+  - name: official
+    type: boolean
+    default: false
+  - name: buildPlatforms
+    type: object
+    default:
+      - x86_64-pc-windows-msvc
+      - aarch64-pc-windows-msvc
+
+variables:
+  system.debug: ${{parameters.debug}}
+  WindowsContainerImage: onebranch.azurecr.io/windows/ltsc2022/vse2022:latest
+  # CDP_DEFINITION_BUILD_COUNT is needed for onebranch.pipeline.version task.
+  # See: https://aka.ms/obpipelines/versioning
+  CDP_DEFINITION_BUILD_COUNT: $[counter('', 0)]
+  # LOAD BEARING - the vpack task fails without these
+  ROOT: $(Build.SourcesDirectory)
+  REPOROOT: $(Build.SourcesDirectory)
+  OUTPUTROOT: $(REPOROOT)\out
+  NUGET_XMLDOC_MODE: none
+
+resources:
+  repositories:
+  - repository: 1esPipelines
+    type: git
+    name: 1ESPipelineTemplates/1ESPipelineTemplates
+    ref: refs/tags/release
+
+extends:
+  ${{ if eq(parameters.official, true) }}:
+    template: v1/1ES.Official.PipelineTemplate.yml@1esPipelines
+  ${{ else }}:
+    template: v1/1ES.Unofficial.PipelineTemplate.yml@1esPipelines
+  parameters:
+    pool:
+      name: SHINE-INT-L
+      demands: ImageOverride -equals SHINE-VS18-Latest
+      os: windows
+    sdl:
+      binskim:
+        # > Due to some legacy reasons, 1ES PT is scanning full sources directory
+        # > for BinSkim tool instead of just scanning the output directory [...]
+        scanOutputDirectoryOnly: true
+      isNativeCode: true
+      tsa:
+        enabled: ${{parameters.official}}
+        configFile: "$(Build.SourcesDirectory)/.pipelines/tsa.json"
+    stages:
+      # Our Build stage builds every target and produces a signed Inno Setup
+      # installer per architecture in $(ob_outputDirectory).
+      - stage: Build
+        jobs:
+          - template: ./.pipelines/templates/job-build-project.yml@self
+            parameters:
+              debug: ${{ parameters.debug }}
+              codeSign: ${{ parameters.official }}
+              buildPlatforms: ${{ parameters.buildPlatforms }}
+              pool:
+                name: SHINE-INT-L
+                demands: ImageOverride -equals SHINE-VS18-Latest
+                os: windows
+              signingIdentity:
+                serviceName: $(SigningServiceName)
+                appId: $(SigningAppId)
+                tenantId: $(SigningTenantId)
+                akvName: $(SigningAKVName)
+                authCertName: $(SigningAuthCertName)
+                signCertName: $(SigningSignCertName)
+                useManagedIdentity: $(SigningUseManagedIdentity)
+                clientId: $(SigningOriginalClientId)
+              outerTemplateContext:
+                outputs:
+                  - output: pipelineArtifact
+                    targetPath: $(ob_outputDirectory)
+                    artifactName: build

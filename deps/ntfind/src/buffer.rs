@@ -15,7 +15,8 @@ use windows_sys::Win32::Globalization::{
 };
 use windows_sys::Win32::Storage::FileSystem::{FILE_TYPE_DISK, GetFileType, ReadFile};
 
-use crate::io::{exit, input_code_page, write_stderr_str};
+use crate::io::StatusResult;
+use crate::io::{input_code_page, write_stderr_str};
 
 /// A helper for wchar_t string buffers. It's rather crude in this state, but it gets the job done.
 /// The original find would rely heavily on ulib's `PATH` type instead.
@@ -196,29 +197,29 @@ impl BufferStream {
         }
     }
 
-    pub fn read_line(&mut self) -> Option<&[u16]> {
+    pub fn read_line(&mut self) -> StatusResult<Option<&[u16]>> {
         if self.stream_type == StreamType::Unknown {
-            self.detect_stream_type();
+            self.detect_stream_type()?;
         }
 
         let line = if self.stream_type == StreamType::Unicode {
-            self.read_line_unicode()?
+            self.read_line_unicode()
         } else {
-            self.read_line_ansi()?
+            self.read_line_ansi()
         };
 
-        Some(line.strip_suffix(&[0x0D]).unwrap_or(line))
+        line.map(|opt| opt.map(|line| line.strip_suffix(&[0x0D]).unwrap_or(line)))
     }
 
     /// Detect whether the stream is ANSI or UTF-16LE.
     /// This replicates `BUFFER_STREAM::DetermineStreamType` and `BUFFER_STREAM::GetBuffer`.
-    fn detect_stream_type(&mut self) {
+    fn detect_stream_type(&mut self) -> StatusResult<()> {
         unsafe {
             self.stream_type = StreamType::Ansi;
 
-            self.fill_buffer();
+            self.fill_buffer()?;
             if self.buffer.is_empty() {
-                return;
+                return Ok(());
             }
 
             // QUIRK / BUG:
@@ -245,11 +246,11 @@ impl BufferStream {
                 if self.buffer.len() >= 2 {
                     self.beg = 2; // skip BOM
                 }
-                return;
+                return Ok(());
             }
 
             if is_unicode == 0 {
-                return;
+                return Ok(());
             }
 
             let flags_match = if GetFileType(self.handle) == FILE_TYPE_DISK {
@@ -264,20 +265,22 @@ impl BufferStream {
             if flags_match && !self.buffer.iter().any(|&b| IsDBCSLeadByte(b) != 0) {
                 self.stream_type = StreamType::Unicode;
             }
+
+            Ok(())
         }
     }
 
-    fn read_line_ansi(&mut self) -> Option<&[u16]> {
+    fn read_line_ansi(&mut self) -> StatusResult<Option<&[u16]>> {
         loop {
             if self.eof {
-                return if self.beg >= self.buffer.len() {
+                return Ok(if self.beg >= self.buffer.len() {
                     None
                 } else {
                     let beg = self.beg;
                     let end = self.buffer.len();
                     self.beg = self.buffer.len();
                     Some(self.convert_to_wide(beg, end))
-                };
+                });
             }
 
             // Look for a line terminator and if found, yield that line.
@@ -289,16 +292,16 @@ impl BufferStream {
                 let end = self.scan + off;
                 self.beg = end + 1;
                 self.scan = self.beg;
-                return Some(self.convert_to_wide(beg, end));
+                return Ok(Some(self.convert_to_wide(beg, end)));
             }
 
             // `buffer[beg..]` has no terminator. Remember that for the next scan.
             self.scan = self.buffer.len();
-            self.fill_buffer();
+            self.fill_buffer()?;
         }
     }
 
-    fn read_line_unicode(&mut self) -> Option<&[u16]> {
+    fn read_line_unicode(&mut self) -> StatusResult<Option<&[u16]>> {
         // QUIRK / BUG:
         // ulib's `BUFFER_STREAM::ReadString` does this, right after finding a newline with `wcscspn`:
         //   if((BytesInBuffer & 0xfffe) != BytesInBuffer){
@@ -328,12 +331,12 @@ impl BufferStream {
             };
 
             if self.eof {
-                return if beg >= wide.len() {
+                return Ok(if beg >= wide.len() {
                     None
                 } else {
                     self.beg = self.buffer.len();
                     Some(&wide[beg..])
-                };
+                });
             }
 
             // Look for a line terminator and if found, yield that line.
@@ -341,16 +344,16 @@ impl BufferStream {
                 let end = scan + off;
                 self.beg = (end + 1) * 2;
                 self.scan = self.beg;
-                return Some(&wide[beg..end]);
+                return Ok(Some(&wide[beg..end]));
             }
 
             // `buffer[beg..]` has no terminator. Remember that for the next scan.
             self.scan = self.buffer.len();
-            self.fill_buffer();
+            self.fill_buffer()?;
         }
     }
 
-    fn fill_buffer(&mut self) {
+    fn fill_buffer(&mut self) -> StatusResult<()> {
         unsafe {
             // Move the partial line to the beginning of the buffer.
             // The idea is that read() calls will either be very slow, and this doesn't matter,
@@ -378,14 +381,15 @@ impl BufferStream {
                 let err = GetLastError();
                 if err == ERROR_BROKEN_PIPE {
                     self.eof = true;
-                    return;
+                    return Ok(());
                 }
                 write_stderr_str("Unable to read file\r\n");
-                exit(2);
+                return Err(2);
             }
 
             self.buffer.set_len(self.buffer.len() + bytes_read as usize);
             self.eof = bytes_read == 0;
+            Ok(())
         }
     }
 
