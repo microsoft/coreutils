@@ -91,6 +91,18 @@ function Update-PowerShellProfile([string]$Path, [bool] $Install, [bool] $UseBom
         $Path = $profile.ResolvedTarget
     }
 
+    # A signed PowerShell profile cannot be modified without invalidating its
+    # Authenticode signature, which breaks profile loading under signed
+    # execution policies (AllSigned/etc.). Detect such profiles and skip them
+    # instead of silently breaking them. See microsoft/coreutils#161.
+    if (Test-Path -LiteralPath $Path) {
+        $signature = Get-AuthenticodeSignature -LiteralPath $Path -ErrorAction Ignore
+        if ($null -ne $signature -and $signature.Status -ne 'NotSigned') {
+            Write-Warning "Skipping signed PowerShell profile '$Path': modifying it would break its Authenticode signature. coreutils commands will not be available in this profile."
+            return
+        }
+    }
+
     # Get-Content uses .NET's StreamReader, so it auto-detects UTF-8/UTF-16 with BOM.
     $text = Get-Content -LiteralPath $Path -Raw -ErrorAction Ignore
     if (!$text) {
