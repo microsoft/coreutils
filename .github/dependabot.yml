@@ -24,6 +24,15 @@ updates:
           - "minor"
           - "patch"
 
+  - package-ecosystem: "gitsubmodule"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    groups:
+      submodule-updates:
+        patterns:
+          - "*"
+
   - package-ecosystem: "nuget"
     directory: "/.pipelines"
     schedule:
