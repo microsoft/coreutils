@@ -40,6 +40,14 @@ function Remove-FileIfExists([string]$Path) {
     }
 }
 
+function Resolve-ProfilePath([string]$Path) {
+    $profileFile = Get-Item -LiteralPath $Path -Force -ErrorAction Ignore
+    if ($profileFile) {
+        return $profileFile.ResolvedTarget
+    }
+    return $Path
+}
+
 function Get-EnabledCoreutilsAliases([string]$CmdDir) {
     [string[]]$disabled = @()
     if ($props = Get-ItemProperty -LiteralPath $CoreutilsRegPath -Name $DisabledUtilitiesRegName -ErrorAction Ignore) {
@@ -78,29 +86,15 @@ function Get-InjectedSection([string]$CmdDir) {
 }
 
 function Update-PowerShellProfile([string]$Path, [bool] $Install, [bool] $UseBom, [string]$Section, [bool]$RefreshOnly) {
-    $parent = Split-Path -LiteralPath $Path
     if ($Install -and !$RefreshOnly) {
+        $parent = Split-Path -LiteralPath $Path
         [void](New-Item -Path $parent -ItemType Directory -Force)
     }
-    elseif (!(Test-Path -LiteralPath $Path)) {
-        return
-    }
 
-    $profile = Get-Item -LiteralPath $Path -Force -ErrorAction Ignore
-    if ($profile) {
-        $Path = $profile.ResolvedTarget
-    }
-
-    # A signed PowerShell profile cannot be modified without invalidating its
-    # Authenticode signature, which breaks profile loading under signed
-    # execution policies (AllSigned/etc.). Detect such profiles and skip them
-    # instead of silently breaking them. See microsoft/coreutils#161.
-    if (Test-Path -LiteralPath $Path) {
-        $signature = Get-AuthenticodeSignature -LiteralPath $Path -ErrorAction Ignore
-        if ($null -ne $signature -and $signature.Status -ne 'NotSigned') {
-            Write-Warning "Skipping signed PowerShell profile '$Path': modifying it would break its Authenticode signature. coreutils commands will not be available in this profile."
-            return
-        }
+    # We cannot re-sign the profile, so skip it.
+    $signature = Get-AuthenticodeSignature -LiteralPath $Path -ErrorAction SilentlyContinue
+    if ($signature -and ($signature.Status -ne [System.Management.Automation.SignatureStatus]::NotSigned)) {
+        return $false
     }
 
     # Get-Content uses .NET's StreamReader, so it auto-detects UTF-8/UTF-16 with BOM.
@@ -116,7 +110,7 @@ function Update-PowerShellProfile([string]$Path, [bool] $Install, [bool] $UseBom
         throw "Invalid coreutils section markers in PowerShell profile: $Path"
     }
     if ($RefreshOnly -and $markerCount -eq 0) {
-        return
+        return $true
     }
 
     # Strip the existing section (markers + content + any surrounding blank lines) in one shot.
@@ -135,7 +129,7 @@ function Update-PowerShellProfile([string]$Path, [bool] $Install, [bool] $UseBom
 
     if (!$text) {
         Remove-FileIfExists $Path
-        return
+        return $true
     }
 
     $text += "`r`n"
@@ -151,6 +145,8 @@ function Update-PowerShellProfile([string]$Path, [bool] $Install, [bool] $UseBom
         Remove-Item -LiteralPath $newPath -Force -ErrorAction Ignore
         throw
     }
+
+    return $true
 }
 
 function Get-MsiPwshProfilePaths {
@@ -243,6 +239,8 @@ function Get-ProfilePlan([bool] $Install, [string]$Scope) {
             return $null
         }
 
+        $Path = Resolve-ProfilePath $Path
+
         $existing = $plan[$Path]
         if ($existing) {
             return $existing
@@ -298,6 +296,9 @@ function Get-RefreshProfilePlan {
         if (!$Path) {
             return
         }
+
+        $Path = Resolve-ProfilePath $Path
+
         if ($plan[$Path]) {
             return
         }
@@ -337,7 +338,10 @@ else {
 }
 
 foreach ($entry in $plan) {
-    Update-PowerShellProfile -Path $entry.Path -Install $entry.Install -UseBom $false -Section $section -RefreshOnly $refresh
+    if (!Update-PowerShellProfile -Path $entry.Path -Install $entry.Install -UseBom $false -Section $section -RefreshOnly $refresh) {
+        # Update failed: Skip the record update.
+        $entry.RecordSid = $null
+    }
 }
 
 # Only adjust records once every Update succeeded. A failure mid-loop leaves
