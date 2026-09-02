@@ -4,7 +4,7 @@ edition = "2024"
 license = "MIT"
 repository = "https://github.com/microsoft/coreutils"
 rust-version = "1.88.0"
-version = "2026.6.16"
+version = "2026.9.3"
 publish = false
 
 [profile.release]
@@ -25,8 +25,8 @@ uucore_procs = { path = "deps/coreutils/src/uucore_procs" }
 # Dependency versions match those used in deps/coreutils.
 wild = "2.2.1"
 clap = { version = "4.5", features = ["wrap_help", "cargo", "color"] }
-itertools = "0.14"
-phf = "0.13"
+itertools = "0.15"
+phf = "0.14"
 textwrap = { version = "0.16", features = ["terminal_size"] }
 uucore = { path = "deps/coreutils/src/uucore" }
 
@@ -144,6 +144,6 @@ features = [
 
 [build-dependencies]
 cc = "1"
-phf_codegen = "0.13"
+phf_codegen = "0.14"
 regex = "1"
 winresource = { version = "0.1", default-features = false }

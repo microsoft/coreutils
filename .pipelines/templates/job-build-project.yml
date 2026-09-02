@@ -147,9 +147,8 @@ jobs:
         displayName: Zip ${{platform}} coreutils.exe/.pdb
 
   # Run ISCC once to generate the uninstaller .e32 file.
-  # Rename .e32 → .exe so the signing task recognises the extension.
-  # The .e32 is arch-independent (confirmed: same hash for x64 and arm64).
-  # ISCC exits with code 1 because the file isn't signed yet.
+  # Rename .e32 -> .exe so the signing task recognises the extension.
+  # The uninstaller is always x86 on all architectures, so we only need to build it once.
   - pwsh: |-
       $iscc = Join-Path $env:InnoSetupRoot 'ISCC.exe'
       New-Item -ItemType Directory -Force '.signing' | Out-Null
