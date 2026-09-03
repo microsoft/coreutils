@@ -167,6 +167,16 @@ function PSConsoleHostReadLine {
             $argsStart = $wordEnd
             # IndexOfAny beats running the regex per arg.
             if ($source.IndexOfAny($script:__COREUTILS_ARG_SPECIAL__) -lt 0) {
+                # PowerShell's Legacy native argument mode can split extension-like
+                # parameter tokens (e.g. -dash.txt -> -dash + .txt) for .cmd
+                # targets. Quote these tokens while leaving ordinary bare globs
+                # unquoted so coreutils can still expand them.
+                if ($source -match '^-[^-][^\s]*\.[^\s]*$' -and
+                    $source.IndexOfAny([char[]]@('*', '?', '[', ']')) -lt 0) {
+                    $rewrittenArgs += "'" + ((__coreutils_q $source).Replace("'", "''")) + "'"
+                    $i++
+                    continue
+                }
                 $rewrittenArgs += $source
                 $i++
                 continue
