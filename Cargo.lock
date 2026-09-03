@@ -462,6 +462,7 @@ dependencies = [
  "uu_unlink",
  "uu_uptime",
  "uu_wc",
+ "uu_which",
  "uu_yes",
  "uucore 0.11.0",
  "wild",
@@ -3413,6 +3414,14 @@ dependencies = [
  "thiserror 2.0.20",
  "unicode-width 0.2.2",
  "uucore 0.11.0",
+]
+
+[[package]]
+name = "uu_which"
+version = "0.0.0"
+dependencies = [
+ "clap",
+ "uucore",
 ]
 
 [[package]]
