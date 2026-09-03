@@ -338,7 +338,7 @@ else {
 }
 
 foreach ($entry in $plan) {
-    if (!Update-PowerShellProfile -Path $entry.Path -Install $entry.Install -UseBom $false -Section $section -RefreshOnly $refresh) {
+    if (!(Update-PowerShellProfile -Path $entry.Path -Install $entry.Install -UseBom $false -Section $section -RefreshOnly $refresh)) {
         # Update failed: Skip the record update.
         $entry.RecordSid = $null
     }
