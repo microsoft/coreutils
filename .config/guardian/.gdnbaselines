@@ -1,0 +1,49 @@
+{
+  "properties": {
+    "helpUri": "https://eng.ms/docs/microsoft-security/security/azure-security/cloudai-security-fundamentals-engineering/security-integration/guardian-wiki/microsoft-guardian/general/baselines"
+  },
+  "version": "1.0.0",
+  "baselines": {
+    "default": {
+      "name": "default",
+      "createdDate": "2026-07-13 23:31:44Z",
+      "lastUpdatedDate": "2026-07-13 23:31:44Z"
+    }
+  },
+  "results": {
+    "c14f4be1751ed5e470dd9115d9e00e451329db70225ebc8b0350f04fe67d5923": {
+      "signature": "c14f4be1751ed5e470dd9115d9e00e451329db70225ebc8b0350f04fe67d5923",
+      "alternativeSignatures": [
+        "7863024fc6c43e5ace380f20865fd5a2648bef5aaf671632a0559ca543d7f98c",
+        "15e22aa42dbc29d0d58ab8bcdfe6abf56dfd66bde59c1997ff6826153987a388"
+      ],
+      "target": "out/coreutils-2026.6.16-arm64.exe",
+      "uriBaseId": "file:///C:/a/_work/1/s/",
+      "memberOf": [
+        "default"
+      ],
+      "tool": "binskim",
+      "ruleId": "BA2018",
+      "createdDate": "2026-07-13 23:31:44Z",
+      "expirationDate": "2026-12-30 23:33:22Z",
+      "justification": "This error is baselined with an expiration date of 180 days from 2026-07-13 23:33:22Z"
+    },
+    "537086c06a8f832462b59ac6331422e9b8f0c5ee79cc0ddaef41b80d798505d1": {
+      "signature": "537086c06a8f832462b59ac6331422e9b8f0c5ee79cc0ddaef41b80d798505d1",
+      "alternativeSignatures": [
+        "a52e27ded11599b796e3b9b3d5e7ff6e2e0d432511182d08b249190daba378ef",
+        "8fea89d785cecdda0b16e725e0f3d099c2dca63cc91312966726f03a0259e9d9"
+      ],
+      "target": "out/coreutils-2026.6.16-x64.exe",
+      "uriBaseId": "file:///C:/a/_work/1/s/",
+      "memberOf": [
+        "default"
+      ],
+      "tool": "binskim",
+      "ruleId": "BA2018",
+      "createdDate": "2026-07-13 23:31:44Z",
+      "expirationDate": "2026-12-30 23:33:22Z",
+      "justification": "This error is baselined with an expiration date of 180 days from 2026-07-13 23:33:22Z"
+    }
+  }
+}
