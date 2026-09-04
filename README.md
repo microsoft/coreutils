@@ -28,6 +28,8 @@ Each command supports the standard `--help` flag for full syntax and options.
 
 ## Install
 
+Please install `pwsh.exe` from [microsoft](https://learn.microsoft.com/en-us/powershell/scripting/install/install-powershell-on-windows?view=powershell-7.6) rather than third-party such as scoop
+
 Install Coreutils for Windows with WinGet:
 
 ```powershell
