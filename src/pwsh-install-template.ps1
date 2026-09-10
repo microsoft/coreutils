@@ -1,31 +1,22 @@
 # vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
+# NOTE: You can disable commands using `coreutils-manager disable <name>`.
+
 # Inlining the template into the profile shaves off ~10ms (25%).
 $script:__COREUTILS__ = [System.Collections.Generic.HashSet[string]]::new(
     [string[]]@('!!COREUTILS!!'),
     [System.StringComparer]::OrdinalIgnoreCase
 )
-
 $script:__COREUTILS_FAST_SKIP__ = [regex]::new(
     '\b(?:' + ($script:__COREUTILS__ -join '|') + ')\b',
     [System.Text.RegularExpressions.RegexOptions]::Compiled -bor `
         [System.Text.RegularExpressions.RegexOptions]::IgnoreCase
 )
-
 # Casting the scriptblock to Func<Ast,bool> once and reusing it avoids the
 # per-FindAll scriptblock-to-delegate wrapping overhead (~1.7x faster).
 $script:__COREUTILS_CMD_PREDICATE__ = [System.Func[System.Management.Automation.Language.Ast, bool]] {
     param($n) $n -is [System.Management.Automation.Language.CommandAst]
 }
-
 $script:__COREUTILS_ARG_SPECIAL__ = [char[]] @("'", '"', '`', '$')
-
-# Wrap arguments into quotes. By being a function we can properly handle $variables.
-# As per MSVCRT, any `\` before `"` must be doubled to escape them.
-function global:__coreutils_q {
-    param($s)
-    '"' + (([string]$s) -replace '(\\*)"', '$1$1\"' -replace '(\\+)$', '$1$1') + '"'
-}
-
 # PowerShell tokenizes `*"a"*` as [BareWord] instead of the expected [DoubleQuoted, BareWord, DoubleQuoted].
 # To work around that we use... regex. Group 1 = 'single', 2 = "double", 3 = `escape, 4 = bare run.
 $script:__COREUTILS_ARG_RX__ = [regex]::new(
@@ -67,9 +58,15 @@ $script:__COREUTILS_ARG_EVAL__ = [System.Text.RegularExpressions.MatchEvaluator]
     # Bare run: passed through unquoted so coreutils can glob it; expand $vars.
     return $ExecutionContext.InvokeCommand.ExpandString($m.Groups[4].Value)
 }
-
 # 0: not tested, 1: coreutils not installed, 2: coreutils installed.
 $script:__COREUTILS_CMD_DIR_TEST__ = 0
+
+# Wrap arguments into quotes. By being a function we can properly handle $variables.
+# As per MSVCRT, any `\` before `"` must be doubled to escape them.
+function global:__coreutils_q {
+    param($s)
+    '"' + (([string]$s) -replace '(\\*)"', '$1$1\"' -replace '(\\+)$', '$1$1') + '"'
+}
 
 # PSConsoleHostReadLine override that rewrites coreutils command names to their
 # .cmd equivalents after PSReadLine returns (history keeps the original).
