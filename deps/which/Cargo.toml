@@ -1,0 +1,20 @@
+[package]
+name = "uu_which"
+description = "which command for Windows"
+repository = "https://github.com/microsoft/coreutils"
+edition = "2024"
+rust-version = "1.88.0"
+version = "0.0.0"
+license = "MIT"
+publish = false
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "which"
+path = "src/main.rs"
+
+[dependencies]
+clap = { version = "4.5", features = ["wrap_help", "cargo", "color"] }
+uucore = { path = "../coreutils/src/uucore" }
