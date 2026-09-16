@@ -38,6 +38,13 @@ Or grab the latest build from our [Release Page](https://github.com/microsoft/co
 
 <br/>
 
+## Listing available commands
+
+To see the commands made available via Coreutils, use:
+```powershell
+coreutils-manager.exe status
+```
+
 ## Creating custom alias
 
 * PowerShell: Set-Alias ll 'ls' or a function in your $PROFILE for arguments, e.g. `function ll { ls -la --color=auto @args }`
