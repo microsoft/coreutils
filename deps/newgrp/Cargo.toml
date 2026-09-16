@@ -1,0 +1,20 @@
+[package]
+name = "uu_newgrp"
+version = "0.0.0"
+edition = "2024"
+license = "MIT"
+publish = false
+
+[dependencies]
+clap = { version = "4.5", features = ["wrap_help"] }
+uucore = { path = "../coreutils/src/uucore" }
+
+[dependencies.windows-sys]
+version = "*"
+features = [
+    "Win32_Security",
+    "Win32_System_Threading",
+    "Win32_Foundation",
+    "Win32_System_Environment",
+    "Win32_System_SystemServices",
+]

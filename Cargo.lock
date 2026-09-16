@@ -421,6 +421,7 @@ dependencies = [
  "uu_mkdir",
  "uu_mktemp",
  "uu_mv",
+ "uu_newgrp",
  "uu_nl",
  "uu_nproc",
  "uu_numfmt",
@@ -2953,6 +2954,15 @@ dependencies = [
  "thiserror 2.0.20",
  "uucore 0.11.0",
  "windows-sys 0.61.2",
+]
+
+[[package]]
+name = "uu_newgrp"
+version = "0.0.0"
+dependencies = [
+ "clap",
+ "uucore",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
