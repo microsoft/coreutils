@@ -89,6 +89,13 @@ Legend: ✅ ships and works · ⚠️ ships but conflicts with a built-in · �
 | `uptime`   |  ✅  |       ⚠️        | |
 | `whoami`   |  🛑  |       🛑        | Conflicts with the built-in Windows command |
 
+### Determining when a command is a Coreutils command
+
+To check if a command is provided by Coreutils (versus being built-into Windows), use the `--version` argument. When  used with a Coreutils command, this will indicate its version. For example, `ls --version`, could respond:
+
+```
+ls (uutils coreutils) 0.8.0
+```
 <br/>
 
 ## Windows caveats
