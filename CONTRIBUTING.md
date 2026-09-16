@@ -7,8 +7,15 @@ Otherwise, you can of course always open an issue for us to look into.
 
 ## Feature requests
 
-Please open a new issue for any feature requests you have in mind.
-Since most of the behavior comes from upstream (`deps/`), new features are usually best discussed (and landed) upstream first.
+Please open a new issue for any feature requests you have in mind.  Since most of the behavior comes from upstream (`deps/`), new features are usually best discussed (and landed) upstream first.
+
+## Adopting Commands
+
+We'll adopt a command by command basis. Some command make sense on Windows, others do not.  A guiding principle is if they have an equivalent on either Linux or macOS, are commonly installed by default, and commonly used: Our answer will be `Yes`.
+
+For instance, pbcopy and pbpaste from macOS would be 100% acceptable
+
+Please create a feature request for an additional commands.  As stated above, most behavior is driven from upstream.
 
 ## Code changes
 
