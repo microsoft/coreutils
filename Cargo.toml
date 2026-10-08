@@ -28,7 +28,7 @@ clap = { version = "4.5", features = ["wrap_help", "cargo", "color"] }
 itertools = "0.15"
 phf = "0.14"
 textwrap = { version = "0.16", features = ["terminal_size"] }
-uucore = { path = "deps/coreutils/src/uucore" }
+uucore = { path = "deps/coreutils/src/uucore", features = ["windows-cng"] }
 
 # coreutils feat_common_core
 # Removed:
@@ -46,12 +46,12 @@ basenc = { package = "uu_basenc", path = "deps/coreutils/src/uu/basenc" }
 cat = { package = "uu_cat", path = "deps/coreutils/src/uu/cat" }
 cksum = { package = "uu_cksum", path = "deps/coreutils/src/uu/cksum" }
 b2sum = { package = "uu_b2sum", path = "deps/coreutils/src/uu/b2sum" }
-md5sum = { package = "uu_md5sum", path = "deps/coreutils/src/uu/md5sum" }
-sha1sum = { package = "uu_sha1sum", path = "deps/coreutils/src/uu/sha1sum" }
+md5sum = { package = "uu_md5sum", path = "deps/coreutils/src/uu/md5sum", features = ["windows-cng"] }
+sha1sum = { package = "uu_sha1sum", path = "deps/coreutils/src/uu/sha1sum", features = ["windows-cng"] }
 sha224sum = { package = "uu_sha224sum", path = "deps/coreutils/src/uu/sha224sum" }
-sha256sum = { package = "uu_sha256sum", path = "deps/coreutils/src/uu/sha256sum" }
-sha384sum = { package = "uu_sha384sum", path = "deps/coreutils/src/uu/sha384sum" }
-sha512sum = { package = "uu_sha512sum", path = "deps/coreutils/src/uu/sha512sum" }
+sha256sum = { package = "uu_sha256sum", path = "deps/coreutils/src/uu/sha256sum", features = ["windows-cng"] }
+sha384sum = { package = "uu_sha384sum", path = "deps/coreutils/src/uu/sha384sum", features = ["windows-cng"] }
+sha512sum = { package = "uu_sha512sum", path = "deps/coreutils/src/uu/sha512sum", features = ["windows-cng"] }
 comm = { package = "uu_comm", path = "deps/coreutils/src/uu/comm" }
 cp = { package = "uu_cp", path = "deps/coreutils/src/uu/cp" }
 csplit = { package = "uu_csplit", path = "deps/coreutils/src/uu/csplit" }
