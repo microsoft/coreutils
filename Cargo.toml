@@ -20,6 +20,7 @@ incremental = true          # Improves re-compile times
 [patch.crates-io]
 uucore = { path = "deps/coreutils/src/uucore" }
 uucore_procs = { path = "deps/coreutils/src/uucore_procs" }
+sha1 = { path = "stubs/sha1" }
 
 [dependencies]
 # Dependency versions match those used in deps/coreutils.
@@ -28,7 +29,7 @@ clap = { version = "4.5", features = ["wrap_help", "cargo", "color"] }
 itertools = "0.15"
 phf = "0.14"
 textwrap = { version = "0.16", features = ["terminal_size"] }
-uucore = { path = "deps/coreutils/src/uucore" }
+uucore = { path = "deps/coreutils/src/uucore", features = ["windows-cng"] }
 
 # coreutils feat_common_core
 # Removed:

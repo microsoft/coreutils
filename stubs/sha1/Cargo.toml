@@ -1,0 +1,12 @@
+[package]
+name = "sha1"
+edition = "2024"
+license = "MIT"
+rust-version = "1.88.0"
+version = "0.11.0"
+publish = false
+
+[features]
+default = ["alloc"]
+alloc = []
+
