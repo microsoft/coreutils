@@ -130,3 +130,17 @@ Commands that exist upstream but aren't shipped here because they rely on POSIX-
 ## Contributing
 
 Bug reports and pull requests are welcome. See [`CONTRIBUTING.md`](./CONTRIBUTING.md) for details on the repo layout and how changes flow between this repo and the upstream uutils projects.
+
+### Local command layout
+
+After building locally, you can create a test layout with per-command entry
+points without running the installer:
+
+```powershell
+.\scripts\create-dev-links.ps1 -Force
+```
+
+The script creates `artifacts\dev-layout\bin\<utility>.exe` and
+`artifacts\dev-layout\cmd\<utility>.cmd` entries for the built `coreutils.exe`.
+It uses hard links first, because they work on NTFS without elevation. If hard
+links are not available, it copies the binary by default.
