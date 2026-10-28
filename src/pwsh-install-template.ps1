@@ -68,6 +68,23 @@ function global:__coreutils_q {
     '"' + (([string]$s) -replace '(\\*)"', '$1$1\"' -replace '(\\+)$', '$1$1') + '"'
 }
 
+# Preserve the existing, possibly customized, PSConsoleHostReadline. `PSVariable.Get` ensures
+# we preserve the original handler when the profile is sourced again (e.g. `. $PROFILE`).
+if (!$ExecutionContext.SessionState.PSVariable.Get('__COREUTILS_PREV_READLINE__')) {
+    $script:__COREUTILS_PREV_READLINE__ = $Function:PSConsoleHostReadLine
+    # It's very untypical for PSConsoleHostReadLine to be $null, but better safe than sorry.
+    # This matches the function definition from the PSReadLine module.
+    if (!$script:__COREUTILS_PREV_READLINE__) {
+        $script:__COREUTILS_PREV_READLINE__ = {
+            [System.Diagnostics.DebuggerHidden()]
+            param()
+            $lastRunStatus = $?
+            Microsoft.PowerShell.Core\Set-StrictMode -Off
+            [Microsoft.PowerShell.PSConsoleReadLine]::ReadLine($host.Runspace, $ExecutionContext, $lastRunStatus)
+        }
+    }
+}
+
 # PSConsoleHostReadLine override that rewrites coreutils command names to their
 # .cmd equivalents after PSReadLine returns (history keeps the original).
 #
@@ -81,12 +98,13 @@ function PSConsoleHostReadLine {
     [System.Diagnostics.DebuggerHidden()]
     param()
 
-    $lastRunStatus = $?
+    # Important: This must be the first call we make,
+    # since __COREUTILS_PREV_READLINE__ internally reads the value of $?.
+    $line = & $script:__COREUTILS_PREV_READLINE__
     Microsoft.PowerShell.Core\Set-StrictMode -Off
-    $line = [Microsoft.PowerShell.PSConsoleReadLine]::ReadLine($host.Runspace, $ExecutionContext, $lastRunStatus)
 
     # If the line contains no coreutils name, we don't need to parse the AST at all.
-    if (-not $script:__COREUTILS_FAST_SKIP__.IsMatch($line)) {
+    if (!$line -or -not $script:__COREUTILS_FAST_SKIP__.IsMatch($line)) {
         return $line
     }
 
